@@ -1,0 +1,231 @@
+<x-gespidieffe::layouts.app breadcrumb="Split PDF">
+
+{{-- =========================================================
+     GESPIDIEFFE – Split PDF  |  Step 1: Upload
+     ========================================================= --}}
+
+<div class="flex flex-col w-full min-h-screen bg-gray-50">
+
+    {{-- ── Titolo pagina ───────────────────────────────────────── --}}
+    <div class="px-8 pt-8 pb-4 text-center">
+        <div class="flex items-center justify-center gap-3 mb-1">
+            <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25
+                         3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+            </svg>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Split PDF</h1>
+        </div>
+        <p class="text-sm text-gray-500 mt-1">Dividi un PDF in più file separati</p>
+    </div>
+
+    {{-- ── Area centrale ─────────────────────────────────────── --}}
+    <div class="flex flex-1 items-center justify-center px-4 py-6">
+        <div class="w-full max-w-xl">
+
+            {{-- Errori di validazione --}}
+            @if ($errors->any())
+                <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <ul class="list-disc list-inside space-y-1">
+                        @foreach ($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            {{-- Card upload --}}
+            <div class="bg-white rounded-2xl shadow-md p-8">
+
+                <form method="POST"
+                      action="{{ route('gespidieffe.split.upload') }}"
+                      enctype="multipart/form-data"
+                      id="uploadForm">
+                    @csrf
+
+                    {{-- Drop zone --}}
+                    <div id="dropZone"
+                         class="relative flex flex-col items-center justify-center
+                                border-2 border-dashed border-gray-300 rounded-xl
+                                bg-gray-50 hover:bg-purple-50 hover:border-purple-400
+                                transition-colors duration-200
+                                p-10 text-center">
+
+                        <svg class="w-14 h-14 text-purple-400 mb-4" fill="none" viewBox="0 0 24 24"
+                             stroke-width="1.5" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125
+                                     1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75
+                                     12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125
+                                     1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504
+                                     1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+
+                        <p class="text-gray-700 font-semibold text-base">
+                            Trascina qui il file PDF
+                        </p>
+                        <p class="text-gray-400 text-sm mt-1">oppure usa il pulsante qui sotto</p>
+
+                        <input type="file"
+                               id="pdfInput"
+                               name="pdf"
+                               accept="application/pdf"
+                               class="hidden"
+                               required>
+
+                        <button type="button"
+                                id="browseBtn"
+                                class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold
+                                       bg-purple-600 hover:bg-purple-700 text-white transition-colors shadow-sm">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                            </svg>
+                            Sfoglia file…
+                        </button>
+                    </div>
+
+                    {{-- File selezionato --}}
+                    <div id="fileInfo" class="hidden mt-4 flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
+                        <svg class="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5
+                                     7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504
+                                     -1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504
+                                     1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                        </svg>
+                        <span id="fileName" class="truncate text-sm text-gray-700 flex-1"></span>
+                        <span id="fileSize" class="text-xs text-gray-400 flex-shrink-0"></span>
+                    </div>
+
+                    {{-- Dimensione massima --}}
+                    <p class="text-xs text-gray-400 text-center mt-3">Max 100 MB</p>
+
+                    {{-- Progress bar --}}
+                    <div id="progressWrap" class="hidden mt-5">
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar"
+                                 class="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                 style="width: 0%"></div>
+                        </div>
+                        <p id="progressText" class="text-xs text-gray-500 text-center mt-1">Caricamento…</p>
+                    </div>
+
+                    {{-- Bottone --}}
+                    <button type="submit"
+                            id="submitBtn"
+                            disabled
+                            class="mt-6 w-full flex items-center justify-center gap-2
+                                   bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300
+                                   text-white font-semibold py-3 rounded-xl
+                                   transition-colors duration-200 focus:outline-none">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021
+                                     18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                        </svg>
+                        Carica e scegli le pagine
+                    </button>
+
+                </form>
+            </div>
+
+            {{-- Info box --}}
+            <div class="mt-8 grid grid-cols-2 gap-4 text-sm text-gray-600">
+                <div class="flex gap-3 items-start bg-white rounded-xl p-4 shadow-sm">
+                    <span class="text-2xl">📄</span>
+                    <div>
+                        <p class="font-semibold text-gray-800">Pagina per pagina</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Genera un file PDF per ogni pagina del documento</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start bg-white rounded-xl p-4 shadow-sm">
+                    <span class="text-2xl">✂️</span>
+                    <div>
+                        <p class="font-semibold text-gray-800">Per intervalli</p>
+                        <p class="text-xs text-gray-500 mt-0.5">Specifica i range di pagine da estrarre (es. 1-3, 5, 7-9)</p>
+                    </div>
+                </div>
+                <div class="flex gap-3 items-start bg-white rounded-xl p-4 shadow-sm col-span-2">
+                    <span class="text-2xl">⚡</span>
+                    <div>
+                        <p class="font-semibold text-gray-800">Split vettoriale</p>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Le pagine vengono estratte senza rasterizzazione: qualità e peso originali preservati.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const dropZone  = document.getElementById('dropZone');
+    const browseBtn = document.getElementById('browseBtn');
+    const input     = document.getElementById('pdfInput');
+    const fileInfo  = document.getElementById('fileInfo');
+    const fileName  = document.getElementById('fileName');
+    const fileSize  = document.getElementById('fileSize');
+    const submitBtn = document.getElementById('submitBtn');
+    const form      = document.getElementById('uploadForm');
+    const progWrap  = document.getElementById('progressWrap');
+    const progBar   = document.getElementById('progressBar');
+    const progText  = document.getElementById('progressText');
+
+    browseBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        input.click();
+    });
+
+    function showFile(file) {
+        if (!file || file.type !== 'application/pdf') {
+            fileInfo.classList.add('hidden');
+            submitBtn.disabled = true;
+            return;
+        }
+        fileName.textContent = file.name;
+        fileSize.textContent = (file.size / 1024 / 1024).toFixed(1) + ' MB';
+        fileInfo.classList.remove('hidden');
+        submitBtn.disabled = false;
+    }
+
+    input.addEventListener('change', () => showFile(input.files[0]));
+
+    // Drag & drop
+    dropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        dropZone.classList.add('bg-purple-50', 'border-purple-400');
+    });
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('bg-purple-50', 'border-purple-400');
+    });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('bg-purple-50', 'border-purple-400');
+        const file = Array.from(e.dataTransfer.files).find(f => f.type === 'application/pdf');
+        if (!file) return;
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        showFile(file);
+    });
+
+    form.addEventListener('submit', e => {
+        if (!input.files[0]) { e.preventDefault(); return; }
+        submitBtn.disabled = true;
+        progWrap.classList.remove('hidden');
+        let pct = 0;
+        const iv = setInterval(() => {
+            pct = Math.min(pct + Math.random() * 12, 90);
+            progBar.style.width = pct + '%';
+            progText.textContent = 'Caricamento… ' + Math.round(pct) + '%';
+        }, 300);
+        window.addEventListener('unload', () => clearInterval(iv));
+    });
+})();
+</script>
+
+</x-gespidieffe::layouts.app>

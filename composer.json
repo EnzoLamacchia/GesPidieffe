@@ -1,0 +1,30 @@
+{
+    "name": "elamacchia/gespidieffe",
+    "description": "Gestione e modifica file PDF (censura, unione, divisione, rotazione, conteggio pagine)",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Enzo Lamacchia",
+            "email": "e.lamacchia@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "setasign/fpdi": "^2.3",
+        "tecnickcom/tcpdf": "^6.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Elamacchia\\Gespidieffe\\": "src/"
+        }
+    },
+    "minimum-stability": "beta",
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Elamacchia\\Gespidieffe\\GespidieffeServiceProvider"
+            ]
+        }
+    }
+}
