@@ -106,8 +106,10 @@ class OrganizzaPdfController extends Controller
         $outName   = $uuid . '_organizzato.pdf';
         $outPath   = $base . $outName;
 
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
         $cmd = sprintf(
-            'qpdf %s --pages . %s -- %s 2>/dev/null',
+            'qpdf %s --pages %s %s -- %s 2>' . $null,
+            escapeshellarg($src),
             escapeshellarg($src),
             escapeshellarg($paginaStr),
             escapeshellarg($outPath)
@@ -156,7 +158,8 @@ class OrganizzaPdfController extends Controller
 
     private function qpdfPageCount(string $pdfPath): int
     {
-        $out = shell_exec(sprintf('qpdf --show-npages %s 2>/dev/null', escapeshellarg($pdfPath)));
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+        $out  = shell_exec(sprintf('qpdf --show-npages %s 2>' . $null, escapeshellarg($pdfPath)));
 
         return (int) trim($out ?? '0');
     }

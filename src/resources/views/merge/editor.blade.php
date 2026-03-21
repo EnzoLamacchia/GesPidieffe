@@ -45,7 +45,7 @@
         <div class="h-6 w-px bg-gray-300 mx-1 ml-auto"></div>
 
         {{-- Unisci e scarica --}}
-        <button @click="unisciEScarica()"
+        <button @@click="unisciEScarica()"
                 :disabled="saving"
                 class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
                        bg-blue-600 hover:bg-blue-700 text-white
@@ -67,8 +67,18 @@
             <span x-text="saving ? 'Elaborazione…' : 'Unisci e scarica PDF'"></span>
         </button>
 
+        {{-- Aggiungi file --}}
+        <button @@click="aggiungiFili()"
+                class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
+                       border border-blue-300 bg-blue-50 text-blue-600 hover:bg-blue-100 transition-all">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Aggiungi file…
+        </button>
+
         {{-- Nuovo merge --}}
-        <button @click="nuovoMerge()"
+        <button @@click="nuovoMerge()"
                 class="flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium
                        border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 transition-all">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -89,60 +99,9 @@
             Trascina le card per cambiare l'ordine dei file nel PDF finale.
         </p>
 
-        {{-- Lista card trascinabili --}}
+        {{-- Lista card trascinabili — popolata via JS, non da Alpine x-for --}}
         <div id="sortableList"
              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 max-w-6xl mx-auto">
-
-            <template x-for="(file, i) in files" :key="file.index">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden
-                            cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-150
-                            select-none"
-                     :data-index="file.index">
-
-                    {{-- Anteprima prima pagina --}}
-                    <div class="relative bg-gray-100 flex items-center justify-center"
-                         style="height: 160px;">
-                        <canvas :id="'thumb-' + file.index"
-                                class="max-w-full max-h-full object-contain block"></canvas>
-
-                        {{-- Spinner di caricamento miniatura --}}
-                        <div :id="'thumb-spinner-' + file.index"
-                             class="absolute inset-0 flex items-center justify-center bg-gray-100">
-                            <svg class="w-6 h-6 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24"
-                                 stroke-width="2" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993
-                                         0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0
-                                         0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                            </svg>
-                        </div>
-
-                        {{-- Badge numero pagine --}}
-                        <span class="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white
-                                     text-xs rounded px-1.5 py-0.5 font-medium"
-                              x-text="file.pages + (file.pages === 1 ? ' pag.' : ' pag.')">
-                        </span>
-                    </div>
-
-                    {{-- Footer card --}}
-                    <div class="px-3 py-2">
-                        {{-- Numero d'ordine --}}
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="w-5 h-5 flex items-center justify-center rounded-full
-                                         bg-blue-600 text-white text-xs font-bold flex-shrink-0"
-                                  x-text="i + 1">
-                            </span>
-                            <p class="text-xs font-medium text-gray-700 truncate" x-text="file.original"></p>
-                        </div>
-                        {{-- Handle drag --}}
-                        <div class="flex items-center justify-center text-gray-300 mt-1">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm8-16a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            </template>
         </div>
     </div>
 
@@ -170,9 +129,11 @@
             download: '{{ url('gespidieffe/merge/download') }}',
             elimina:  '{{ route('gespidieffe.merge.elimina', ['session' => $session]) }}',
             pdfBase:  '{{ url('gespidieffe/merge/pdf/' . $session) }}',
+            aggiungi: '{{ route('gespidieffe.merge.aggiungi', ['session' => $session]) }}',
         },
         csrf: '{{ csrf_token() }}',
     };
+    window._mergeSkipCleanup = false;
 </script>
 
 {{-- ── Script principale (Alpine component) ─────────────── --}}
@@ -180,6 +141,8 @@
 function mergeEditor() {
     return {
         session:    window._mergeEditor.session,
+        // "files" è usato solo per totalPages e per costruire l'ordine al salvataggio.
+        // Il DOM delle card è gestito interamente da JS/SortableJS — niente x-for.
         files:      window._mergeEditor.files.map(f => ({ ...f })),
         saving:     false,
         toast:      { show: false, msg: '', type: 'success' },
@@ -188,54 +151,96 @@ function mergeEditor() {
             return this.files.reduce((s, f) => s + (f.pages || 0), 0);
         },
 
-        // ── Init: carica miniature e attiva drag & drop ─────────
+        // ── Init ────────────────────────────────────────────────
         async init() {
             pdfjsLib.GlobalWorkerOptions.workerSrc =
                 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-            // Aspetta il rendering DOM di Alpine
-            await this.$nextTick();
+            // Costruisce le card nel DOM (una volta sola)
+            this.buildCards();
 
-            // Carica miniature in parallelo
+            // Carica le miniature in parallelo (aggiorna il DOM direttamente)
             await Promise.all(this.files.map(f => this.loadThumb(f)));
 
             // Attiva SortableJS
             this.initSortable();
         },
 
-        // ── Carica la miniatura della prima pagina di un file ───
+        // ── Costruisce le card nel DOM ───────────────────────────
+        // Ogni card ha data-index=N (indice fisso del file).
+        buildCards() {
+            const list = document.getElementById('sortableList');
+            list.innerHTML = '';
+            this.files.forEach(file => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden ' +
+                                 'cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-150 select-none';
+                card.dataset.index = file.index;
+                card.innerHTML = `
+                    <div class="relative bg-gray-100 flex items-center justify-center" style="height:160px;">
+                        <img id="thumb-img-${file.index}"
+                             class="max-w-full max-h-full object-contain block hidden" />
+                        <div id="thumb-spinner-${file.index}"
+                             class="absolute inset-0 flex items-center justify-center bg-gray-100">
+                            <svg class="w-6 h-6 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24"
+                                 stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992
+                                         m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7
+                                         M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                            </svg>
+                        </div>
+                        <span class="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white
+                                     text-xs rounded px-1.5 py-0.5 font-medium">
+                            ${file.pages} pag.
+                        </span>
+                    </div>
+                    <div class="px-3 py-2">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="w-5 h-5 flex items-center justify-center rounded-full
+                                         bg-blue-600 text-white text-xs font-bold flex-shrink-0">
+                                ${file.index + 1}
+                            </span>
+                            <p class="text-xs font-medium text-gray-700 truncate"
+                               title="${file.original}">${file.original}</p>
+                        </div>
+                        <div class="flex items-center justify-center text-gray-300 mt-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010
+                                         4zm0 8a2 2 0 110-4 2 2 0 010 4zm8-16a2 2 0 110-4 2 2 0 010
+                                         4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4z"/>
+                            </svg>
+                        </div>
+                    </div>`;
+                list.appendChild(card);
+            });
+        },
+
+        // ── Carica la miniatura della prima pagina e la mostra nella card ──
         async loadThumb(file) {
             const url = window._mergeEditor.routes.pdfBase + '/' + file.index;
             try {
                 const pdfDoc   = await pdfjsLib.getDocument(url).promise;
                 const page     = await pdfDoc.getPage(1);
                 const viewport = page.getViewport({ scale: 0.4 });
-
-                // Attendi canvas nel DOM
-                let canvas = null;
-                for (let t = 0; t < 30; t++) {
-                    canvas = document.getElementById('thumb-' + file.index);
-                    if (canvas) break;
-                    await new Promise(r => setTimeout(r, 50));
-                }
-                if (!canvas) return;
-
-                canvas.width  = viewport.width;
-                canvas.height = viewport.height;
+                const canvas   = document.createElement('canvas');
+                canvas.width   = viewport.width;
+                canvas.height  = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 page.cleanup();
                 pdfDoc.destroy();
 
-                // Nasconde spinner
+                const img = document.getElementById('thumb-img-' + file.index);
                 const spinner = document.getElementById('thumb-spinner-' + file.index);
-                if (spinner) spinner.style.display = 'none';
+                if (img) { img.src = canvas.toDataURL('image/png'); img.classList.remove('hidden'); }
+                if (spinner) spinner.remove();
             } catch (e) {
                 const spinner = document.getElementById('thumb-spinner-' + file.index);
                 if (spinner) spinner.innerHTML = '<span class="text-xs text-gray-400">N/D</span>';
             }
         },
 
-        // ── SortableJS: drag & drop card ────────────────────────
+        // ── SortableJS: aggiorna solo l'array interno, non tocca il DOM ──
         initSortable() {
             const list = document.getElementById('sortableList');
             if (!list) return;
@@ -243,13 +248,11 @@ function mergeEditor() {
             Sortable.create(list, {
                 animation: 150,
                 ghostClass: 'opacity-40',
-                onEnd() {
-                    // querySelectorAll esclude i nodi <template> di Alpine
-                    const cards    = Array.from(list.querySelectorAll('[data-index]'));
-                    const newOrder = cards.map(el => parseInt(el.dataset.index));
-                    const byIndex  = {};
-                    self.files.forEach(f => { byIndex[f.index] = f; });
-                    self.files = newOrder.filter(i => !isNaN(i)).map(i => byIndex[i]).filter(Boolean);
+                onEnd(evt) {
+                    // SortableJS ha già spostato il nodo nel DOM.
+                    // Sincronizziamo l'array interno con lo stesso splice.
+                    const moved = self.files.splice(evt.oldIndex, 1)[0];
+                    self.files.splice(evt.newIndex, 0, moved);
                 },
             });
         },
@@ -259,8 +262,12 @@ function mergeEditor() {
             if (this.saving) return;
             this.saving = true;
             try {
-                const order = this.files.map(f => f.index);
-                const resp  = await fetch(window._mergeEditor.routes.applica, {
+                // Legge l'ordine corrente direttamente dal DOM (source of truth dopo il drag)
+                const list  = document.getElementById('sortableList');
+                const order = Array.from(list.querySelectorAll('[data-index]'))
+                                   .map(el => parseInt(el.dataset.index));
+
+                const resp = await fetch(window._mergeEditor.routes.applica, {
                     method:  'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -305,10 +312,17 @@ function mergeEditor() {
             this.eliminaSessione();
             window.location.href = '{{ route('gespidieffe.merge') }}';
         },
+
+        aggiungiFili() {
+            // Naviga alla pagina aggiungi senza eliminare la sessione
+            window._mergeSkipCleanup = true;
+            window.location.href = window._mergeEditor.routes.aggiungi;
+        },
     };
 }
 
 window.addEventListener('beforeunload', () => {
+    if (window._mergeSkipCleanup) return;
     const m = window._mergeEditor;
     if (!m) return;
     const blob = new Blob(

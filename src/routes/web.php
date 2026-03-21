@@ -33,6 +33,7 @@ Route::group([
     Route::get('/merge',                              [MergePdfController::class, 'index'])->name('merge');
     Route::post('/merge/upload',                      [MergePdfController::class, 'upload'])->name('merge.upload');
     Route::get('/merge/editor/{session}',             [MergePdfController::class, 'editor'])->name('merge.editor');
+    Route::get('/merge/aggiungi/{session}',           [MergePdfController::class, 'aggiungi'])->name('merge.aggiungi');
     Route::post('/merge/applica',                     [MergePdfController::class, 'applica'])->name('merge.applica');
     Route::get('/merge/download/{file}',              [MergePdfController::class, 'download'])->name('merge.download');
     Route::match(['delete', 'post'], '/merge/elimina/{session}', [MergePdfController::class, 'elimina'])->name('merge.elimina');

@@ -139,7 +139,8 @@ Assicurarsi che il cron di Laravel sia attivo sul server:
 
 ## Route
 
-Tutte le route sono protette dal middleware `['web', 'auth:sanctum', 'verified']`.
+Tutte le route sono protette dal middleware `['web', 'auth:sanctum', 'verified']`: solo gli utenti autenticati e verificati possono accedere. I guest vengono reindirizzati automaticamente al login da Sanctum/Jetstream.
+
 Prefix URI: `/gespidieffe` — Named prefix: `gespidieffe.`
 
 | Metodo | URI | Nome route |
@@ -155,6 +156,7 @@ Prefix URI: `/gespidieffe` — Named prefix: `gespidieffe.`
 | GET | `/gespidieffe/merge` | `gespidieffe.merge` |
 | POST | `/gespidieffe/merge/upload` | `gespidieffe.merge.upload` |
 | GET | `/gespidieffe/merge/editor/{session}` | `gespidieffe.merge.editor` |
+| GET | `/gespidieffe/merge/aggiungi/{session}` | `gespidieffe.merge.aggiungi` |
 | POST | `/gespidieffe/merge/applica` | `gespidieffe.merge.applica` |
 | GET | `/gespidieffe/merge/download/{file}` | `gespidieffe.merge.download` |
 | DELETE/POST | `/gespidieffe/merge/elimina/{session}` | `gespidieffe.merge.elimina` |

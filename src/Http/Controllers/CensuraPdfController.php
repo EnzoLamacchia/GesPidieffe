@@ -107,30 +107,34 @@ class CensuraPdfController extends Controller
         $pageCount = $this->qpdfPageCount($srcPath);
         abort_if($pageCount === 0, 500, 'Impossibile leggere il PDF.');
 
-        $dpi    = 200;
-        $ptToMm = 25.4 / 72.0;
+        $dpi = 200;
 
         // Lista di file PDF parziali che verranno uniti alla fine
         $parts = [];
 
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
         for ($p = 1; $p <= $pageCount; $p++) {
             $partPath = $base . $token . '_part_p' . $p . '.pdf';
 
             if (!isset($rectsByPage[$p])) {
                 // ── Pagina originale: copia con qpdf (vettoriale, peso minimo) ──
                 $cmd = sprintf(
-                    'qpdf %s --pages . %d -- %s 2>/dev/null',
+                    'qpdf %s --pages %s %d -- %s 2>' . $null,
+                    escapeshellarg($srcPath),
                     escapeshellarg($srcPath),
                     $p,
                     escapeshellarg($partPath)
                 );
                 exec($cmd);
             } else {
-                // ── Pagina censurata: rasterizza + rettangoli TCPDF ──
+                // ── Pagina censurata: rasterizza → brucia i rettangoli nel PNG → PDF ──
+                // I rettangoli vengono "bruciati" direttamente sui pixel dell'immagine
+                // tramite GD, prima di creare il PDF. Nessun layer vettoriale separato:
+                // il contenuto originale è irrecuperabile anche copiando dal PDF.
                 $pngPath = $base . $token . '_rast_p' . $p . '.png';
 
                 $gs = sprintf(
-                    'gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r%d -dFirstPage=%d -dLastPage=%d -sOutputFile=%s %s 2>/dev/null',
+                    'gs -dNOPAUSE -dBATCH -sDEVICE=png16m -r%d -dFirstPage=%d -dLastPage=%d -sOutputFile=%s %s 2>' . $null,
                     $dpi, $p, $p,
                     escapeshellarg($pngPath),
                     escapeshellarg($srcPath)
@@ -139,7 +143,37 @@ class CensuraPdfController extends Controller
 
                 abort_unless(file_exists($pngPath), 500, "Impossibile rasterizzare la pagina $p.");
 
-                [$pxW, $pxH] = getimagesize($pngPath);
+                // ── Brucia i rettangoli nel PNG con GD ──────────────────
+                $img = imagecreatefrompng($pngPath);
+                abort_unless($img !== false, 500, "Impossibile aprire il PNG della pagina $p.");
+
+                $pxW = imagesx($img);
+                $pxH = imagesy($img);
+                $pxPerPt = $dpi / 72.0; // fattore di conversione pt → pixel
+
+                foreach ($rectsByPage[$p] as $rect) {
+                    $color = $rect['color'] === 'black'
+                        ? imagecolorallocate($img, 0, 0, 0)
+                        : imagecolorallocate($img, 255, 255, 255);
+
+                    $x1 = (int) round((float) $rect['x'] * $pxPerPt);
+                    $y1 = (int) round((float) $rect['y'] * $pxPerPt);
+                    $x2 = (int) round(((float) $rect['x'] + (float) $rect['w']) * $pxPerPt);
+                    $y2 = (int) round(((float) $rect['y'] + (float) $rect['h']) * $pxPerPt);
+
+                    // Clamp ai bordi dell'immagine
+                    $x1 = max(0, min($x1, $pxW - 1));
+                    $y1 = max(0, min($y1, $pxH - 1));
+                    $x2 = max(0, min($x2, $pxW - 1));
+                    $y2 = max(0, min($y2, $pxH - 1));
+
+                    imagefilledrectangle($img, $x1, $y1, $x2, $y2, $color);
+                }
+
+                imagepng($img, $pngPath);
+                imagedestroy($img);
+                // ────────────────────────────────────────────────────────
+
                 $wMm = ($pxW / $dpi) * 25.4;
                 $hMm = ($pxH / $dpi) * 25.4;
 
@@ -150,19 +184,8 @@ class CensuraPdfController extends Controller
                 $pdf->setPrintFooter(false);
 
                 $pdf->AddPage($wMm > $hMm ? 'L' : 'P', [$wMm, $hMm]);
+                // Solo l'immagine — nessun rettangolo TCPDF sopra
                 $pdf->Image($pngPath, 0, 0, $wMm, $hMm, 'PNG', '', '', false, 300, '', false, false, 0);
-
-                foreach ($rectsByPage[$p] as $rect) {
-                    $color = $rect['color'] === 'black' ? [0, 0, 0] : [255, 255, 255];
-                    $pdf->SetFillColor(...$color);
-                    $pdf->Rect(
-                        (float) $rect['x'] * $ptToMm,
-                        (float) $rect['y'] * $ptToMm,
-                        (float) $rect['w'] * $ptToMm,
-                        (float) $rect['h'] * $ptToMm,
-                        'F'
-                    );
-                }
 
                 $pdf->Output($partPath, 'F');
                 @unlink($pngPath);
@@ -178,7 +201,7 @@ class CensuraPdfController extends Controller
 
         $pageArgs = implode(' ', array_map(fn($f) => escapeshellarg($f), $parts));
         $mergeCmd = sprintf(
-            'qpdf --empty --pages %s -- %s 2>/dev/null',
+            'qpdf --empty --pages %s -- %s 2>' . $null,
             $pageArgs,
             escapeshellarg($outPath)
         );

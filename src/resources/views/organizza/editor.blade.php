@@ -2,19 +2,19 @@
 
 @push('scripts')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <style>
+        .sortable-ghost   { opacity: 0.4; }
+        .sortable-chosen  { outline: 2px solid #eab308; outline-offset: 2px; }
+        .page-selected    { outline: 3px solid #3b82f6 !important; outline-offset: 2px; }
+    </style>
 @endpush
 
 {{-- =========================================================
      GESPIDIEFFE – Organizza pagine  |  Step 2: Editor
 
-     Layout:
-     ┌──────────────────────────────────────────────────────────┐
-     │  TOOLBAR (titolo + salva + nuovo)                         │
-     ├──────────────────────────────────────────────────────────┤
-     │  GRIGLIA MINIATURE (drag&drop) – a piena larghezza        │
-     │  Ogni card: miniatura PDF.js + badge numero + azioni      │
-     └──────────────────────────────────────────────────────────┘
+     DOM delle card gestito interamente da JS (come merge/editor),
+     NON da Alpine x-for — così Sortable e miniature non confliggono.
      ========================================================= --}}
 
 <div class="flex flex-col w-full h-screen overflow-hidden bg-gray-100"
@@ -39,20 +39,27 @@
         </div>
 
         <span class="text-xs text-gray-500 whitespace-nowrap truncate max-w-xs" x-text="original"></span>
-        <span class="text-xs text-gray-400 whitespace-nowrap">
-            &bull; <span x-text="pages.length"></span> pagine
-            <template x-if="pages.length !== totalPages">
-                <span class="text-yellow-600 font-medium">
-                    (originale: <span x-text="totalPages"></span>)
-                </span>
-            </template>
+        <span class="text-xs text-gray-400 whitespace-nowrap" id="badge-pagine">
+            &bull; <span id="badge-count">0</span> pagine
+        </span>
+
+        {{-- Badge selezione multipla (gestito via JS) --}}
+        <span id="badge-selezione"
+              class="hidden items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 text-xs font-semibold">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span id="badge-selezione-count"></span> selezionate
+            <button onclick="organizzaDeselezionaTutte()" class="ml-1 hover:text-blue-900 font-bold">&times;</button>
         </span>
 
         <div class="h-6 w-px bg-gray-300 mx-1 ml-auto"></div>
 
-        {{-- Pulsante annulla modifiche --}}
-        <button @click="ripristina()"
-                :disabled="saving || !isModificato"
+        {{-- Ripristina --}}
+        <button id="btn-ripristina"
+                @click="ripristina()"
+                disabled
                 class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
                        border border-gray-300 bg-white text-gray-500
                        hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed
@@ -64,9 +71,9 @@
             Ripristina
         </button>
 
-        {{-- Pulsante salva --}}
+        {{-- Salva --}}
         <button @click="eseguiOrganizza()"
-                :disabled="saving || pages.length === 0"
+                :disabled="saving"
                 class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold
                        bg-yellow-500 hover:bg-yellow-600 text-white
                        disabled:bg-gray-300 disabled:cursor-not-allowed
@@ -95,11 +102,18 @@
         </button>
     </div>
 
-    {{-- ── BODY: griglia miniature ──────────────────────────── --}}
+    {{-- ── Hint selezione multipla ──────────────────────────── --}}
+    <div class="px-5 py-1.5 bg-blue-50 border-b border-blue-100 text-xs text-blue-500 flex-shrink-0">
+        Trascina le miniature per riordinarle. Tieni premuto
+        <kbd class="px-1 py-0.5 bg-blue-100 rounded font-mono">Ctrl</kbd>
+        e clicca per selezionarne più di una, poi trascinale insieme.
+    </div>
+
+    {{-- ── BODY ─────────────────────────────────────────────── --}}
     <div class="flex-1 overflow-auto p-6">
 
-        {{-- Placeholder caricamento --}}
-        <div x-show="loading"
+        {{-- Spinner iniziale --}}
+        <div id="loadingPlaceholder"
              class="flex flex-col items-center justify-center h-full gap-4 text-gray-400">
             <svg class="w-10 h-10 animate-spin text-yellow-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round"
@@ -111,8 +125,8 @@
         </div>
 
         {{-- Placeholder nessuna pagina --}}
-        <div x-show="!loading && pages.length === 0"
-             class="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
+        <div id="emptyPlaceholder"
+             class="hidden flex-col items-center justify-center h-full gap-3 text-gray-400">
             <svg class="w-16 h-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round"
                       d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5
@@ -121,98 +135,16 @@
                          1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
             </svg>
             <p class="text-sm font-medium text-gray-400">Tutte le pagine sono state eliminate.</p>
-            <button @click="ripristina()"
+            <button onclick="document.querySelector('[x-data]').__x.$data.ripristina()"
                     class="text-sm text-yellow-600 underline hover:text-yellow-700">
                 Ripristina l'originale
             </button>
         </div>
 
-        {{-- Griglia drag&drop --}}
-        <div x-show="!loading && pages.length > 0"
-             id="gridContainer"
-             class="grid gap-4 max-w-7xl mx-auto"
+        {{-- Griglia card — popolata interamente da JS --}}
+        <div id="gridContainer"
+             class="hidden grid gap-4 max-w-7xl mx-auto"
              style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));">
-
-            <template x-for="(page, idx) in pages" :key="page.uid">
-                <div class="relative bg-white rounded-xl shadow-sm border border-gray-200
-                            hover:shadow-md hover:border-yellow-300 transition-all duration-150
-                            cursor-grab active:cursor-grabbing group select-none"
-                     :data-uid="page.uid">
-
-                    {{-- Miniatura --}}
-                    <div class="relative bg-gray-100 rounded-t-xl overflow-hidden flex items-center justify-center"
-                         style="min-height: 190px;">
-                        <canvas :id="'canvas-' + page.uid"
-                                class="max-w-full max-h-full block object-contain"></canvas>
-                        <div :id="'spinner-' + page.uid"
-                             class="absolute inset-0 flex items-center justify-center bg-gray-100">
-                            <svg class="w-5 h-5 animate-spin text-yellow-300" fill="none" viewBox="0 0 24 24"
-                                 stroke-width="2" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993
-                                         0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0
-                                         0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                            </svg>
-                        </div>
-                    </div>
-
-                    {{-- Badge numero pagina originale --}}
-                    <div class="absolute top-2 left-2
-                                bg-black bg-opacity-50 text-white text-xs font-bold
-                                px-1.5 py-0.5 rounded-md leading-none">
-                        <span x-text="page.originalPage"></span>
-                    </div>
-
-                    {{-- Badge duplicata --}}
-                    <div x-show="page.isDuplicate"
-                         class="absolute top-2 right-2
-                                bg-yellow-500 text-white text-xs font-bold
-                                px-1.5 py-0.5 rounded-md leading-none">
-                        copia
-                    </div>
-
-                    {{-- Footer card: numero posizione + azioni --}}
-                    <div class="px-3 py-2 flex items-center justify-between
-                                bg-gray-100 border-t border-gray-200 rounded-b-xl">
-                        <span class="text-xs text-gray-500 font-semibold" x-text="idx + 1 + ' / ' + pages.length"></span>
-
-                        <div class="flex items-center gap-1">
-                            {{-- Duplica --}}
-                            <button @click.stop="duplicaPagina(idx)"
-                                    title="Duplica pagina"
-                                    class="p-1.5 rounded-lg bg-gray-200 text-gray-600
-                                           hover:bg-yellow-500 hover:text-white transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125
-                                             1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75
-                                             a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504
-                                             1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0
-                                             00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5
-                                             4.625v3.375M12 18.75h.008v.008H12v-.008z" />
-                                </svg>
-                            </button>
-                            {{-- Elimina --}}
-                            <button @click.stop="chiediElimina(idx)"
-                                    title="Elimina pagina"
-                                    class="p-1.5 rounded-lg bg-gray-200 text-gray-600
-                                           hover:bg-red-500 hover:text-white transition-colors">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                          d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107
-                                             1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244
-                                             2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456
-                                             0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114
-                                             1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18
-                                             -.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037
-                                             -2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0
-                                             00-7.5 0" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </template>
         </div>
     </div>
 
@@ -289,13 +221,36 @@
     };
 </script>
 
-{{-- ── Script Alpine component ────────────────────────────── --}}
 <script>
-// pdfDoc salvato FUORI dal Proxy di Alpine
-window._organizzaPdfDoc = null;
+// ── Stato globale (fuori da Alpine per evitare proxy) ────────
+window._orgPdfDoc    = null;   // documento PDF.js
+window._orgPages     = [];     // [{uid, originalPage, isDuplicate}] — source of truth
+window._orgOriginal  = [];     // copia immutabile per ripristino
+window._orgSelected  = {};     // uid → true  (selezione multipla)
+window._orgUidCount  = 0;
 
-// Contatore uid univoci per le card (necessario per duplicati)
-window._organizzaUidCounter = 0;
+// ── Helpers globali richiamati da onclick inline ─────────────
+function organizzaDeselezionaTutte() {
+    window._orgSelected = {};
+    document.querySelectorAll('#gridContainer > [data-uid]').forEach(el => {
+        el.classList.remove('page-selected');
+    });
+    _organizzaAggiornaBadgeSelezione();
+}
+
+function _organizzaAggiornaBadgeSelezione() {
+    const n   = Object.keys(window._orgSelected).length;
+    const el  = document.getElementById('badge-selezione');
+    const cnt = document.getElementById('badge-selezione-count');
+    if (n > 0) {
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+        cnt.textContent = n;
+    } else {
+        el.classList.add('hidden');
+        el.classList.remove('flex');
+    }
+}
 
 function organizzaEditor() {
     return {
@@ -303,75 +258,159 @@ function organizzaEditor() {
         totalPages: window._organizzaEditor.totalPages,
         original:   window._organizzaEditor.original,
 
-        // Array di pagine nell'ordine corrente
-        // Ogni elemento: { uid: string, originalPage: number, isDuplicate: bool }
-        pages: [],
-
-        // Stato originale (per ripristino)
-        originalPages: [],
-
-        loading: true,
-        saving:  false,
-
-        confirmDialog: { show: false, msg: '', idx: null },
-        toast: { show: false, msg: '', type: 'success' },
-
-        // Sortable.js instance
-        _sortable: null,
-
-        get isModificato() {
-            if (this.pages.length !== this.originalPages.length) return true;
-            return this.pages.some((p, i) => p.originalPage !== this.originalPages[i].originalPage);
-        },
+        saving:        false,
+        confirmDialog: { show: false, msg: '', uid: null },
+        toast:         { show: false, msg: '', type: 'success' },
 
         // ── Init ─────────────────────────────────────────────────
         async init() {
             pdfjsLib.GlobalWorkerOptions.workerSrc =
                 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-            // Carica PDF.js PRIMA di popolare pages, così quando x-for inserisce i canvas
-            // il documento è già pronto e non ci sono doppie chiamate a render
             try {
-                window._organizzaPdfDoc = await pdfjsLib.getDocument(
+                window._orgPdfDoc = await pdfjsLib.getDocument(
                     window._organizzaEditor.routes.pdf
                 ).promise;
             } catch (e) {
-                console.error('PDF.js: impossibile caricare il documento', e);
+                console.error('PDF.js: impossibile caricare', e);
             }
 
-            // Costruisce l'array delle pagine: lo facciamo DOPO aver caricato PDF.js,
-            // così il x-for parte una sola volta con i canvas già pronti
-            const pagesArr = [];
+            // Costruisce l'array di pagine
+            const arr = [];
             for (let n = 1; n <= this.totalPages; n++) {
-                const uid = 'p' + (++window._organizzaUidCounter);
-                pagesArr.push({ uid, originalPage: n, isDuplicate: false });
+                arr.push({ uid: 'p' + (++window._orgUidCount), originalPage: n, isDuplicate: false });
             }
-            this.originalPages = pagesArr.map(p => ({ ...p }));
-            this.pages         = pagesArr;   // un solo assign → un solo ciclo x-for
+            window._orgOriginal = arr.map(p => ({ ...p }));
+            window._orgPages    = arr;
 
-            this.loading = false;
+            // Costruisce il DOM e carica le miniature
+            this._buildGrid();
+            await this._renderAllThumbs();
+            this._initSortable();
 
-            // Aspetta che Alpine inserisca i canvas nel DOM
-            await this.$nextTick();
-            this.renderAllThumbs();
-            this.initSortable();
+            document.getElementById('loadingPlaceholder').classList.add('hidden');
+            this._aggiornaBadgeCount();
+            this._aggiornaRipristina();
         },
 
-        // ── Rendering miniature ──────────────────────────────────
-        async renderAllThumbs() {
-            if (!window._organizzaPdfDoc) return;
-            for (const page of this.pages) {
-                await this.renderThumb(page);
+        // ── Costruisce le card nel DOM ───────────────────────────
+        _buildGrid() {
+            const grid = document.getElementById('gridContainer');
+            grid.innerHTML = '';
+
+            window._orgPages.forEach((page, idx) => {
+                grid.appendChild(this._creaCard(page, idx));
+            });
+
+            this._mostraGriglia();
+        },
+
+        // ── Crea una singola card ────────────────────────────────
+        _creaCard(page, idx) {
+            const div = document.createElement('div');
+            div.className = 'relative bg-white rounded-xl shadow-sm border border-gray-200 ' +
+                            'hover:shadow-md hover:border-yellow-300 transition-all duration-150 ' +
+                            'cursor-grab active:cursor-grabbing select-none';
+            div.dataset.uid = page.uid;
+
+            const badgeCopia = page.isDuplicate
+                ? `<div class="absolute top-2 right-2 bg-yellow-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-md leading-none">copia</div>`
+                : '';
+
+            const posLabel = (idx + 1) + ' / ' + window._orgPages.length;
+
+            div.innerHTML = `
+                <div class="relative bg-gray-100 rounded-t-xl overflow-hidden flex items-center justify-center" style="min-height:190px;">
+                    <canvas id="canvas-${page.uid}" class="max-w-full max-h-full block object-contain"></canvas>
+                    <div id="spinner-${page.uid}" class="absolute inset-0 flex items-center justify-center bg-gray-100">
+                        <svg class="w-5 h-5 animate-spin text-yellow-300" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993
+                                     0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0
+                                     0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                        </svg>
+                    </div>
+                </div>
+                <div class="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs font-bold px-1.5 py-0.5 rounded-md leading-none">
+                    ${page.originalPage}
+                </div>
+                ${badgeCopia}
+                <div class="px-3 py-2 flex items-center justify-between bg-gray-100 border-t border-gray-200 rounded-b-xl">
+                    <span class="pos-label text-xs text-gray-500 font-semibold">${posLabel}</span>
+                    <div class="flex items-center gap-1">
+                        <button data-action="duplica" data-action-uid="${page.uid}"
+                                title="Duplica pagina"
+                                class="p-1.5 rounded-lg bg-gray-200 text-gray-600 hover:bg-yellow-500 hover:text-white transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125
+                                         1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75
+                                         a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504
+                                         1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0
+                                         00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5
+                                         4.625v3.375M12 18.75h.008v.008H12v-.008z"/>
+                            </svg>
+                        </button>
+                        <button data-action="elimina" data-action-uid="${page.uid}"
+                                title="Elimina pagina"
+                                class="p-1.5 rounded-lg bg-gray-200 text-gray-600 hover:bg-red-500 hover:text-white transition-colors">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107
+                                         1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244
+                                         2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456
+                                         0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114
+                                         1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18
+                                         -.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037
+                                         -2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>`;
+
+            // Click sulla card: Ctrl+click per selezione multipla
+            div.addEventListener('click', (evt) => {
+                if (!evt.ctrlKey && !evt.metaKey) return;
+                evt.preventDefault();
+                const uid = div.dataset.uid;
+                if (window._orgSelected[uid]) {
+                    delete window._orgSelected[uid];
+                    div.classList.remove('page-selected');
+                } else {
+                    window._orgSelected[uid] = true;
+                    div.classList.add('page-selected');
+                }
+                _organizzaAggiornaBadgeSelezione();
+            });
+
+            // Pulsanti azioni
+            div.addEventListener('click', (evt) => {
+                const btn = evt.target.closest('[data-action]');
+                if (!btn) return;
+                evt.stopPropagation();
+                const uid = btn.dataset.actionUid;
+                if (btn.dataset.action === 'duplica') this.duplicaPagina(uid);
+                if (btn.dataset.action === 'elimina') this.chiediElimina(uid);
+            });
+
+            return div;
+        },
+
+        // ── Renderizza tutte le miniature ────────────────────────
+        async _renderAllThumbs() {
+            if (!window._orgPdfDoc) return;
+            for (const page of window._orgPages) {
+                await this._renderThumb(page);
             }
         },
 
-        async renderThumb(page) {
-            if (!window._organizzaPdfDoc) return;
+        async _renderThumb(page) {
+            if (!window._orgPdfDoc) return;
             const canvas  = document.getElementById('canvas-' + page.uid);
             const spinner = document.getElementById('spinner-' + page.uid);
             if (!canvas) return;
             try {
-                const pdfPage  = await window._organizzaPdfDoc.getPage(page.originalPage);
+                const pdfPage  = await window._orgPdfDoc.getPage(page.originalPage);
                 const viewport = pdfPage.getViewport({ scale: 0.5 });
                 canvas.width   = viewport.width;
                 canvas.height  = viewport.height;
@@ -383,84 +422,187 @@ function organizzaEditor() {
             }
         },
 
-        // ── Sortable.js ──────────────────────────────────────────
-        initSortable() {
+        // ── Sortable ─────────────────────────────────────────────
+        _initSortable() {
             const grid = document.getElementById('gridContainer');
             if (!grid || typeof Sortable === 'undefined') return;
+            const self = this;
 
-            this._sortable = Sortable.create(grid, {
-                animation:     150,
-                ghostClass:    'opacity-40',
-                chosenClass:   'ring-2 ring-yellow-400',
-                dragClass:     'shadow-xl',
-                onEnd: (evt) => {
-                    // Sincronizza array Alpine con l'ordine DOM aggiornato da Sortable
-                    const uids = Array.from(grid.querySelectorAll('[data-uid]'))
-                                      .map(el => el.dataset.uid);
-                    const map  = Object.fromEntries(this.pages.map(p => [p.uid, p]));
-                    this.pages = uids.map(uid => map[uid]).filter(Boolean);
+            Sortable.create(grid, {
+                animation:   150,
+                ghostClass:  'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+
+                onStart(evt) {
+                    const uid = evt.item.dataset.uid;
+                    // Se la card trascinata non è nel gruppo selezionato, deseleziona tutto
+                    if (!window._orgSelected[uid]) {
+                        organizzaDeselezionaTutte();
+                    }
+                },
+
+                onEnd(evt) {
+                    const uid    = evt.item.dataset.uid;
+                    const selUids = Object.keys(window._orgSelected);
+
+                    if (selUids.length > 1 && window._orgSelected[uid]) {
+                        // ── Blocco: sposta tutte le selezionate ──────────
+                        const anchorEl = grid.querySelector(':scope > [data-uid="' + uid + '"]');
+
+                        const blocco = window._orgPages.filter(p => window._orgSelected[p.uid]);
+                        const bloccoEls = blocco
+                            .map(p => grid.querySelector(':scope > [data-uid="' + p.uid + '"]'))
+                            .filter(el => el && el !== anchorEl);
+
+                        let dopo = anchorEl;
+                        for (const el of bloccoEls) {
+                            if (dopo.nextSibling) {
+                                grid.insertBefore(el, dopo.nextSibling);
+                            } else {
+                                grid.appendChild(el);
+                            }
+                            dopo = el;
+                        }
+
+                        // Sincronizza _orgPages con il nuovo ordine DOM
+                        const nuoviUids = Array.from(
+                            grid.querySelectorAll(':scope > [data-uid]')
+                        ).map(el => el.dataset.uid);
+                        const map = Object.fromEntries(window._orgPages.map(p => [p.uid, p]));
+                        window._orgPages = nuoviUids.map(u => map[u]).filter(Boolean);
+
+                    } else {
+                        // ── Singolo: sincronizza con splice ──────────────
+                        const moved = window._orgPages.splice(evt.oldIndex, 1)[0];
+                        window._orgPages.splice(evt.newIndex, 0, moved);
+                    }
+
+                    self._aggiornaFooterPositions();
+                    self._aggiornaBadgeCount();
+                    self._aggiornaRipristina();
                 },
             });
         },
 
+        // ── Aggiorna i label "pos / tot" nel footer di ogni card ─
+        _aggiornaFooterPositions() {
+            const cards = Array.from(
+                document.querySelectorAll('#gridContainer > [data-uid]')
+            );
+            const tot = cards.length;
+            cards.forEach((card, idx) => {
+                const lbl = card.querySelector('.pos-label');
+                if (lbl) lbl.textContent = (idx + 1) + ' / ' + tot;
+            });
+        },
+
+        _aggiornaBadgeCount() {
+            const n = window._orgPages.length;
+            document.getElementById('badge-count').textContent = n;
+            this._mostraGriglia();
+        },
+
+        _mostraGriglia() {
+            const grid  = document.getElementById('gridContainer');
+            const empty = document.getElementById('emptyPlaceholder');
+            if (window._orgPages.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                empty.classList.add('flex');
+            } else {
+                grid.classList.remove('hidden');
+                empty.classList.add('hidden');
+                empty.classList.remove('flex');
+            }
+        },
+
+        _aggiornaRipristina() {
+            const orig = window._orgOriginal;
+            const curr = window._orgPages;
+            const btn  = document.getElementById('btn-ripristina');
+            if (!btn) return;
+            const modificato = curr.length !== orig.length ||
+                curr.some((p, i) => p.originalPage !== orig[i].originalPage);
+            btn.disabled = !modificato;
+        },
+
         // ── Duplica pagina ───────────────────────────────────────
-        async duplicaPagina(idx) {
-            const orig = this.pages[idx];
-            const uid  = 'p' + (++window._organizzaUidCounter);
-            const copy = { uid, originalPage: orig.originalPage, isDuplicate: true };
+        async duplicaPagina(uid) {
+            const idx  = window._orgPages.findIndex(p => p.uid === uid);
+            if (idx < 0) return;
+            const orig = window._orgPages[idx];
+            const copy = { uid: 'p' + (++window._orgUidCount), originalPage: orig.originalPage, isDuplicate: true };
+            window._orgPages.splice(idx + 1, 0, copy);
 
-            this.pages.splice(idx + 1, 0, copy);
+            // Inserisce la nuova card subito dopo quella originale nel DOM
+            const grid    = document.getElementById('gridContainer');
+            const cards   = Array.from(grid.querySelectorAll(':scope > [data-uid]'));
+            const refCard = cards[idx];
+            const newCard = this._creaCard(copy, idx + 1);
+            if (refCard && refCard.nextSibling) {
+                grid.insertBefore(newCard, refCard.nextSibling);
+            } else {
+                grid.appendChild(newCard);
+            }
 
-            // Dopo render DOM, disegna la miniatura e riinizializza Sortable
-            await this.$nextTick();
-            await this.renderThumb(copy);
-            this.reinitSortable();
+            this._aggiornaFooterPositions();
+            this._aggiornaBadgeCount();
+            this._aggiornaRipristina();
+            await this._renderThumb(copy);
         },
 
         // ── Chiedi conferma eliminazione ─────────────────────────
-        chiediElimina(idx) {
-            const page = this.pages[idx];
+        chiediElimina(uid) {
+            const page = window._orgPages.find(p => p.uid === uid);
+            if (!page) return;
+            const idx = window._orgPages.indexOf(page);
             this.confirmDialog = {
                 show: true,
                 msg:  `Sei sicuro di voler eliminare la pagina ${page.originalPage} (posizione ${idx + 1})?`,
-                idx,
+                uid,
             };
         },
 
-        // ── Conferma ed esegui eliminazione ─────────────────────
-        async confermaElimina() {
-            const idx = this.confirmDialog.idx;
-            if (idx !== null && idx >= 0 && idx < this.pages.length) {
-                this.pages.splice(idx, 1);
+        confermaElimina() {
+            const uid = this.confirmDialog.uid;
+            const idx = window._orgPages.findIndex(p => p.uid === uid);
+            if (idx >= 0) {
+                window._orgPages.splice(idx, 1);
+                const card = document.querySelector(`#gridContainer [data-uid="${uid}"]`);
+                if (card) card.remove();
             }
-            this.confirmDialog = { show: false, msg: '', idx: null };
-            await this.$nextTick();
-            this.reinitSortable();
+            this.confirmDialog = { show: false, msg: '', uid: null };
+            this._aggiornaFooterPositions();
+            this._aggiornaBadgeCount();
+            this._aggiornaRipristina();
         },
 
         // ── Ripristina ordine originale ──────────────────────────
         async ripristina() {
-            this.pages = this.originalPages.map(p => ({ ...p }));
-            await this.$nextTick();
-            this.renderAllThumbs();
-            this.reinitSortable();
+            window._orgPages    = window._orgOriginal.map(p => ({ ...p }));
+            window._orgSelected = {};
+            _organizzaAggiornaBadgeSelezione();
+            this._buildGrid();
+            await this._renderAllThumbs();
+            this._aggiornaFooterPositions();
+            this._aggiornaBadgeCount();
+            this._aggiornaRipristina();
+            this._initSortable();
         },
 
-        // ── Reinizializza Sortable dopo modifiche al DOM ─────────
-        reinitSortable() {
-            if (this._sortable) {
-                this._sortable.destroy();
-                this._sortable = null;
-            }
-            this.initSortable();
-        },
-
-        // ── Esegui organizzazione e scarica ─────────────────────
+        // ── Salva PDF ────────────────────────────────────────────
         async eseguiOrganizza() {
-            if (this.saving || this.pages.length === 0) return;
+            if (this.saving || window._orgPages.length === 0) return;
             this.saving = true;
             try {
-                const ordine = this.pages.map(p => p.originalPage).join(',');
+                // Source of truth: legge dal DOM
+                const ordine = Array.from(
+                    document.querySelectorAll('#gridContainer > [data-uid]')
+                ).map(el => {
+                    const uid  = el.dataset.uid;
+                    const page = window._orgPages.find(p => p.uid === uid);
+                    return page ? page.originalPage : null;
+                }).filter(Boolean).join(',');
 
                 const resp = await fetch(window._organizzaEditor.routes.applica, {
                     method:  'POST',
@@ -477,14 +619,12 @@ function organizzaEditor() {
                 }
 
                 const data = await resp.json();
-
                 const a    = document.createElement('a');
                 a.download = 'organizzato.pdf';
                 a.href     = window._organizzaEditor.routes.download + '/' + data.download_token;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
-
                 this.showToast('PDF organizzato scaricato!', 'success');
             } catch (err) {
                 this.showToast(err.message, 'error');

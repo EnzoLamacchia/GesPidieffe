@@ -22,11 +22,51 @@ class MergePdfController extends Controller
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Step 1b – Upload (POST: riceve i file, crea sessione)
+    // Step 1b – Upload (POST: riceve i file, crea sessione o aggiunge a sessione esistente)
     // ─────────────────────────────────────────────────────────────
 
     public function upload(Request $request)
     {
+        $existingSession = $request->input('existing_session');
+
+        if ($existingSession) {
+            // ── Caso A: aggiunta a sessione esistente (min 1 file) ────────────────
+            $request->validate([
+                'pdfs'   => ['required', 'array', 'min:1', 'max:20'],
+                'pdfs.*' => ['required', 'file', 'mimes:pdf', 'max:51200'],
+            ]);
+
+            $manifestPath = storage_path('app/' . $this->folder . '/' . $existingSession . '_manifest.json');
+            abort_unless(file_exists($manifestPath), 404, 'Sessione non trovata.');
+
+            $manifest = json_decode(file_get_contents($manifestPath), true);
+            $base     = storage_path('app/' . $this->folder . '/');
+
+            // Calcola il prossimo indice disponibile
+            $nextIndex = empty($manifest['files']) ? 0 : (max(array_column($manifest['files'], 'index')) + 1);
+
+            foreach ($request->file('pdfs') as $i => $file) {
+                $idx      = $nextIndex + $i;
+                $filename = $existingSession . '_f' . $idx . '.pdf';
+                Storage::disk($this->disk)->putFileAs($this->folder, $file, $filename);
+                $manifest['files'][] = [
+                    'index'    => $idx,
+                    'filename' => $filename,
+                    'original' => $file->getClientOriginalName(),
+                    'pages'    => $this->qpdfPageCount($base . $filename),
+                ];
+                $manifest['order'][] = $idx;
+            }
+
+            Storage::disk($this->disk)->put(
+                $this->folder . '/' . $existingSession . '_manifest.json',
+                json_encode($manifest)
+            );
+
+            return redirect()->route('gespidieffe.merge.editor', ['session' => $existingSession]);
+        }
+
+        // ── Caso B: nuova sessione (min 2 file) ───────────────────────────────
         $request->validate([
             'pdfs'   => ['required', 'array', 'min:2', 'max:20'],
             'pdfs.*' => ['required', 'file', 'mimes:pdf', 'max:51200'],
@@ -59,6 +99,23 @@ class MergePdfController extends Controller
         );
 
         return redirect()->route('gespidieffe.merge.editor', ['session' => $session]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Step 1c – Aggiungi file a sessione esistente (GET: mostra upload con sessione)
+    // ─────────────────────────────────────────────────────────────
+
+    public function aggiungi(string $session)
+    {
+        $manifestPath = storage_path('app/' . $this->folder . '/' . $session . '_manifest.json');
+        abort_unless(file_exists($manifestPath), 404, 'Sessione non trovata.');
+
+        $manifest = json_decode(file_get_contents($manifestPath), true);
+
+        return view('gespidieffe::merge.upload', [
+            'existingSession' => $session,
+            'existingFiles'   => $manifest['files'],
+        ]);
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -133,8 +190,9 @@ class MergePdfController extends Controller
         $outPath  = $base . $outToken . '.pdf';
 
         $pageArgs = implode(' ', array_map(fn($f) => escapeshellarg($f), $orderedPaths));
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
         $cmd = sprintf(
-            'qpdf --empty --pages %s -- %s 2>/dev/null',
+            'qpdf --empty --pages %s -- %s 2>' . $null,
             $pageArgs,
             escapeshellarg($outPath)
         );
@@ -180,7 +238,8 @@ class MergePdfController extends Controller
 
     private function qpdfPageCount(string $pdfPath): int
     {
-        $out = shell_exec(sprintf('qpdf --show-npages %s 2>/dev/null', escapeshellarg($pdfPath)));
+        $null = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+        $out  = shell_exec(sprintf('qpdf --show-npages %s 2>' . $null, escapeshellarg($pdfPath)));
 
         return (int) trim($out ?? '0');
     }

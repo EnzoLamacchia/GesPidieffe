@@ -34,8 +34,29 @@
                 @endisset
             </div>
 
-            {{-- Destra: utente + torna alla dashboard --}}
+            {{-- Destra: dropdown Funzioni + utente + torna alla dashboard --}}
             <div class="flex items-center gap-4">
+
+                {{-- Dropdown Funzioni --}}
+                <div class="relative" x-data="{ open: false }" @@click.outside="open = false">
+                    <button @@click="open = !open"
+                            class="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors mr-6">
+                        Funzioni
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+                        </svg>
+                    </button>
+                    <div x-show="open" x-transition
+                         class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-50">
+                        <a href="{{ route('gespidieffe.censura') }}"   class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-red-500">●</span> Censura PDF</a>
+                        <a href="{{ route('gespidieffe.merge') }}"     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-blue-500">●</span> Merge PDF</a>
+                        <a href="{{ route('gespidieffe.split') }}"     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-green-500">●</span> Split PDF</a>
+                        <a href="{{ route('gespidieffe.organizza') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-purple-500">●</span> Organizza pagine</a>
+                        <a href="{{ route('gespidieffe.ruota') }}"     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-yellow-500">●</span> Ruota pagine</a>
+                        <a href="{{ route('gespidieffe.numera') }}"    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-pink-500">●</span> Numera pagine</a>
+                    </div>
+                </div>
+
                 @auth
                     <span class="text-sm text-gray-500 hidden sm:inline">
                         {{ auth()->user()->name }} {{ auth()->user()->surname ?? '' }}

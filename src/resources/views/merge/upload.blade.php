@@ -13,9 +13,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round"
                       d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
             </svg>
-            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Merge PDF</h1>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">
+                @if(isset($existingSession)) Aggiungi file al merge @else Merge PDF @endif
+            </h1>
         </div>
-        <p class="text-sm text-gray-500 mt-1">Unisci più file PDF in un unico documento</p>
+        <p class="text-sm text-gray-500 mt-1">
+            @if(isset($existingSession))
+                Seleziona i nuovi PDF da aggiungere alla sessione in corso
+            @else
+                Unisci più file PDF in un unico documento
+            @endif
+        </p>
     </div>
 
     {{-- ── Area centrale ─────────────────────────────────────── --}}
@@ -41,6 +49,37 @@
                       enctype="multipart/form-data"
                       id="uploadForm">
                     @csrf
+                    @if(isset($existingSession))
+                        <input type="hidden" name="existing_session" value="{{ $existingSession }}">
+                    @endif
+
+                    {{-- File già in sessione (solo in modalità aggiungi) --}}
+                    @if(isset($existingFiles))
+                        <div class="mb-5">
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                Già nella sessione ({{ count($existingFiles) }} file)
+                            </p>
+                            <ul class="space-y-1.5">
+                                @foreach($existingFiles as $ef)
+                                    <li class="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                                        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                  d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5
+                                                     7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504
+                                                     -1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504
+                                                     1.125-1.125V11.25a9 9 0 00-9-9z"/>
+                                        </svg>
+                                        <span class="truncate text-gray-500 flex-1">{{ $ef['original'] }}</span>
+                                        <span class="text-xs text-gray-400 flex-shrink-0">{{ $ef['pages'] }} pag.</span>
+                                        <svg class="w-3.5 h-3.5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                        </svg>
+                                    </li>
+                                @endforeach
+                            </ul>
+                            <p class="text-xs text-blue-600 mt-2">Seleziona qui sotto i file da aggiungere:</p>
+                        </div>
+                    @endif
 
                     {{-- Drop zone (click apre il selettore file) --}}
                     <div id="dropZone"
@@ -70,8 +109,7 @@
                                name="pdfs[]"
                                accept="application/pdf"
                                class="hidden"
-                               multiple
-                               required>
+                               multiple>
 
                         {{-- Pulsante sfoglia filesystem --}}
                         <button type="button"
@@ -88,6 +126,35 @@
 
                     {{-- Lista file selezionati --}}
                     <ul id="fileList" class="mt-4 space-y-2 hidden"></ul>
+
+                    {{-- Pulsante aggiungi altri file (visibile solo dopo la prima selezione) --}}
+                    <div id="addMoreWrap" class="hidden mt-3 flex justify-center">
+                        <button type="button"
+                                id="addMoreBtn"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                                       border border-blue-300 text-blue-600 bg-blue-50
+                                       hover:bg-blue-100 transition-colors">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Aggiungi altri file…
+                        </button>
+                        <input type="file" id="addMoreInput" accept="application/pdf" class="hidden" multiple>
+                    </div>
+
+                    {{-- Alert: serve almeno 1 altro file (solo in modalità normale) --}}
+                    <div id="alertMinFile"
+                         class="hidden mt-3 flex items-start gap-2 px-4 py-3 bg-amber-50
+                                border border-amber-300 rounded-lg text-sm text-amber-800">
+                        <svg class="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" fill="none"
+                             viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948
+                                     3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949
+                                     3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                        </svg>
+                        Per eseguire il merge occorrono almeno 2 file. Aggiungi un secondo PDF.
+                    </div>
 
                     {{-- Dimensione massima --}}
                     <p class="text-xs text-gray-400 text-center mt-3">Max 50 MB per file &bull; Da 2 a 20 file</p>
@@ -115,7 +182,7 @@
                                   d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021
                                      18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
                         </svg>
-                        Carica e organizza
+                        @if(isset($existingSession)) Aggiungi al merge @else Carica e organizza @endif
                     </button>
 
                 </form>
@@ -154,30 +221,58 @@
 
 <script>
 (function () {
-    const dropZone  = document.getElementById('dropZone');
-    const browseBtn = document.getElementById('browseBtn');
-    const input     = document.getElementById('pdfsInput');
-    const fileList  = document.getElementById('fileList');
-    const submitBtn = document.getElementById('submitBtn');
-    const form      = document.getElementById('uploadForm');
-    const progWrap  = document.getElementById('progressWrap');
-    const progBar   = document.getElementById('progressBar');
-    const progText  = document.getElementById('progressText');
+    const isAggiungi  = {{ isset($existingSession) ? 'true' : 'false' }};
+    const dropZone    = document.getElementById('dropZone');
+    const browseBtn   = document.getElementById('browseBtn');
+    const input       = document.getElementById('pdfsInput');
+    const addMoreWrap = document.getElementById('addMoreWrap');
+    const addMoreBtn  = document.getElementById('addMoreBtn');
+    const addMoreInput= document.getElementById('addMoreInput');
+    const fileList    = document.getElementById('fileList');
+    const alertMin    = document.getElementById('alertMinFile');
+    const submitBtn   = document.getElementById('submitBtn');
+    const form        = document.getElementById('uploadForm');
+    const progWrap    = document.getElementById('progressWrap');
+    const progBar     = document.getElementById('progressBar');
+    const progText    = document.getElementById('progressText');
 
-    browseBtn.addEventListener('click', e => {
-        e.stopPropagation();
-        input.click();
-    });
+    // Stato: array di File accumulati
+    let selectedFiles = [];
 
-    function renderList(files) {
+    // ── Aggiunge file evitando duplicati (nome + dimensione) ────
+    function addFiles(newFiles) {
+        newFiles.forEach(f => {
+            const dup = selectedFiles.some(e => e.name === f.name && e.size === f.size);
+            if (!dup && selectedFiles.length < 20) selectedFiles.push(f);
+        });
+        renderList();
+    }
+
+    // ── Rimuove un file per indice ──────────────────────────────
+    function removeFile(idx) {
+        selectedFiles.splice(idx, 1);
+        renderList();
+    }
+
+    // ── Ridisegna lista + aggiorna alert e pulsanti ─────────────
+    function renderList() {
         fileList.innerHTML = '';
-        if (!files.length) {
+        const count = selectedFiles.length;
+
+        if (!count) {
             fileList.classList.add('hidden');
+            addMoreWrap.classList.add('hidden');
+            alertMin.classList.add('hidden');
             submitBtn.disabled = true;
             return;
         }
+
         fileList.classList.remove('hidden');
-        files.forEach((f, i) => {
+        addMoreWrap.classList.remove('hidden');
+        // Alert solo in modalità normale con esattamente 1 file
+        alertMin.classList.toggle('hidden', isAggiungi || count !== 1);
+
+        selectedFiles.forEach((f, i) => {
             const li = document.createElement('li');
             li.className = 'flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm';
             li.innerHTML = `
@@ -189,16 +284,41 @@
                              1.125-1.125V11.25a9 9 0 00-9-9z"/>
                 </svg>
                 <span class="truncate text-gray-700 flex-1">${f.name}</span>
-                <span class="text-xs text-gray-400 flex-shrink-0">${(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                <span class="text-xs text-gray-400 flex-shrink-0 mr-1">${(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                <button type="button" data-idx="${i}" title="Rimuovi"
+                        class="remove-btn flex-shrink-0 text-gray-400 hover:text-red-500 transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             `;
             fileList.appendChild(li);
         });
-        submitBtn.disabled = files.length < 2;
+
+        fileList.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => removeFile(parseInt(btn.dataset.idx)));
+        });
+
+        submitBtn.disabled = isAggiungi ? count < 1 : count < 2;
     }
 
-    input.addEventListener('change', () => renderList(Array.from(input.files)));
+    // ── Selezione iniziale via "Sfoglia" ────────────────────────
+    browseBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        input.click();
+    });
+    input.addEventListener('change', () => {
+        addFiles(Array.from(input.files));
+    });
 
-    // Drag & drop
+    // ── Pulsante "Aggiungi altri file" ──────────────────────────
+    addMoreBtn.addEventListener('click', () => addMoreInput.click());
+    addMoreInput.addEventListener('change', () => {
+        addFiles(Array.from(addMoreInput.files).filter(f => f.type === 'application/pdf'));
+        addMoreInput.value = '';
+    });
+
+    // ── Drag & drop (accumula, non sostituisce) ─────────────────
     dropZone.addEventListener('dragover', e => {
         e.preventDefault();
         dropZone.classList.add('bg-blue-50', 'border-blue-400');
@@ -209,16 +329,20 @@
     dropZone.addEventListener('drop', e => {
         e.preventDefault();
         dropZone.classList.remove('bg-blue-50', 'border-blue-400');
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-        if (!files.length) return;
-        const dt = new DataTransfer();
-        files.forEach(f => dt.items.add(f));
-        input.files = dt.files;
-        renderList(files);
+        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+        if (dropped.length) addFiles(dropped);
     });
 
+    // ── Submit: ricostruisce DataTransfer da selectedFiles ──────
     form.addEventListener('submit', e => {
-        if (input.files.length < 2) { e.preventDefault(); return; }
+        const minRequired = isAggiungi ? 1 : 2;
+        if (selectedFiles.length < minRequired) { e.preventDefault(); return; }
+
+        // Ricostruisce input.files da selectedFiles prima dell'invio
+        const dt = new DataTransfer();
+        selectedFiles.forEach(f => dt.items.add(f));
+        input.files = dt.files;
+
         submitBtn.disabled = true;
         progWrap.classList.remove('hidden');
         let pct = 0;
