@@ -3,6 +3,7 @@
 namespace Elamacchia\Gespidieffe\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Elamacchia\Gespidieffe\Services\ContatorePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -131,6 +132,8 @@ class SplitPdfController extends Controller
         if (count($outputFiles) === 1) {
             $token = $uuid . '_split_0_' . $outputFiles[0]['label'];
 
+            (new ContatorePdfService())->incrementa('split');
+
             return response()->json([
                 'tipo'           => 'singolo',
                 'download_token' => $token,
@@ -150,6 +153,8 @@ class SplitPdfController extends Controller
         $zip->close();
 
         abort_unless(file_exists($zipPath), 500, 'ZIP non creato.');
+
+        (new ContatorePdfService())->incrementa('split');
 
         return response()->json([
             'tipo'           => 'zip',

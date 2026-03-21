@@ -19,6 +19,7 @@ Fa parte dell'ecosistema **AdmEL** ed è progettato per essere integrato come pa
 | **Organizza pagine** | Griglia drag & drop per riordinare, duplicare o eliminare singole pagine |
 | **Ruota pagine** | Ruota singole pagine o l'intero documento a passi di 90°; badge visivo con i gradi correnti |
 | **Numerazione pagine** | Aggiunge numeri di pagina con posizione, font, dimensione e colore personalizzabili; testo originale rimane selezionabile |
+| **Statistiche utilizzo** | Dashboard con contatori giornalieri, settimanali e globali per ciascuna funzione; storico delle ultime 12 settimane; accessibile solo agli utenti con permesso `usa gespidieffe` |
 
 ---
 
@@ -134,6 +135,7 @@ Assicurarsi che il cron di Laravel sia attivo sul server:
 |---|---|
 | `php artisan gespidieffe:pulisci-tmp` | Elimina i file temporanei più vecchi di 24 ore (default) |
 | `php artisan gespidieffe:pulisci-tmp --ore=48` | Elimina i file più vecchi di N ore |
+| `php artisan gespidieffe:azzera-contatori` | Azzera manualmente tutti i contatori (giornalieri, settimanali, globali) e salva lo storico |
 
 ---
 
@@ -190,6 +192,9 @@ Prefix URI: `/gespidieffe` — Named prefix: `gespidieffe.`
 | GET | `/gespidieffe/numera/download/{file}` | `gespidieffe.numera.download` |
 | DELETE/POST | `/gespidieffe/numera/elimina/{file}` | `gespidieffe.numera.elimina` |
 | GET | `/gespidieffe/numera/pdf/{file}` | `gespidieffe.numera.pdf` |
+| GET | `/gespidieffe/statistiche` | `gespidieffe.statistiche` |
+
+> La route `/statistiche` richiede il middleware aggiuntivo `permission:usa gespidieffe` (Spatie Laravel Permission).
 
 ---
 
@@ -229,7 +234,8 @@ package/gespidieffe/
 └── src/
     ├── GespidieffeServiceProvider.php
     ├── Console/
-    │   └── PulisciTmpCommand.php
+    │   ├── PulisciTmpCommand.php
+    │   └── AzzeraContatoriCommand.php
     ├── Http/Controllers/
     │   ├── GespidieffeController.php
     │   ├── CensuraPdfController.php
@@ -237,12 +243,23 @@ package/gespidieffe/
     │   ├── SplitPdfController.php
     │   ├── OrganizzaPdfController.php
     │   ├── RuotaPdfController.php
-    │   └── NumeraPdfController.php
+    │   ├── NumeraPdfController.php
+    │   └── StatisticheController.php
+    ├── Models/
+    │   ├── GespidieffeContatore.php
+    │   └── GespidieffeStoricoSettimanale.php
+    ├── Services/
+    │   └── ContatorePdfService.php
+    ├── database/migrations/
+    │   ├── 2024_01_01_000001_create_gespidieffe_contatori_table.php
+    │   └── 2024_01_01_000002_create_gespidieffe_storico_settimanale_table.php
     ├── routes/
     │   └── web.php
     └── resources/views/
         ├── layouts/app.blade.php
         ├── home.blade.php
+        ├── statistiche/
+        │   └── index.blade.php
         ├── censura/
         │   ├── upload.blade.php
         │   └── editor.blade.php

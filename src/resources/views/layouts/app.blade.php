@@ -54,6 +54,10 @@
                         <a href="{{ route('gespidieffe.organizza') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-purple-500">●</span> Organizza pagine</a>
                         <a href="{{ route('gespidieffe.ruota') }}"     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-yellow-500">●</span> Ruota pagine</a>
                         <a href="{{ route('gespidieffe.numera') }}"    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-pink-500">●</span> Numera pagine</a>
+                        @if (auth()->user()->can('usa gespidieffe'))
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <a href="{{ route('gespidieffe.statistiche') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><span class="text-gray-400">●</span> Statistiche utilizzo</a>
+                        @endif
                     </div>
                 </div>
 

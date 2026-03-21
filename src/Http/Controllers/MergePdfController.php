@@ -3,6 +3,7 @@
 namespace Elamacchia\Gespidieffe\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Elamacchia\Gespidieffe\Services\ContatorePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -199,6 +200,8 @@ class MergePdfController extends Controller
         exec($cmd);
 
         abort_unless(file_exists($outPath), 500, 'Merge fallito.');
+
+        (new ContatorePdfService())->incrementa('merge');
 
         return response()->json(['download_token' => $outToken]);
     }

@@ -3,6 +3,7 @@
 namespace Elamacchia\Gespidieffe\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Elamacchia\Gespidieffe\Services\ContatorePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -128,6 +129,8 @@ class RuotaPdfController extends Controller
 
             abort_unless(file_exists($outPath), 500, 'Elaborazione fallita.');
         }
+
+        (new ContatorePdfService())->incrementa('ruota');
 
         return response()->json([
             'download_token' => $uuid . '_ruotato',

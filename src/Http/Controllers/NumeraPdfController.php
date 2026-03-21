@@ -3,6 +3,7 @@
 namespace Elamacchia\Gespidieffe\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Elamacchia\Gespidieffe\Services\ContatorePdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -138,6 +139,8 @@ class NumeraPdfController extends Controller
         @unlink($overlayPath);
 
         abort_unless(file_exists($outPath), 500, 'Elaborazione pdftk fallita.');
+
+        (new ContatorePdfService())->incrementa('numera');
 
         return response()->json([
             'download_token' => $uuid . '_numerato',
