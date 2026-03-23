@@ -8,6 +8,7 @@ use Elamacchia\Gespidieffe\Http\Controllers\OrganizzaPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\RuotaPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\SplitPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\StatisticheController;
+use Elamacchia\Gespidieffe\Http\Controllers\UnisciOrganizzaController;
 use Illuminate\Support\Facades\Route;
 
 Route::group([
@@ -81,5 +82,18 @@ Route::group([
     Route::get('/numera/download/{file}',                          [NumeraPdfController::class, 'download'])->name('numera.download');
     Route::match(['delete', 'post'], '/numera/elimina/{file}',     [NumeraPdfController::class, 'elimina'])->name('numera.elimina');
     Route::get('/numera/pdf/{file}',                               [NumeraPdfController::class, 'servePdf'])->name('numera.pdf');
+
+    // --- Unisci e Organizza ---
+    Route::get('/unisci-organizza',                                                   [UnisciOrganizzaController::class, 'index'])->name('unisciorganizza');
+    Route::post('/unisci-organizza/upload',                                           [UnisciOrganizzaController::class, 'upload'])->name('unisciorganizza.upload');
+    Route::get('/unisci-organizza/aggiungi/{session}',                                [UnisciOrganizzaController::class, 'aggiungi'])->name('unisciorganizza.aggiungi');
+    Route::get('/unisci-organizza/editor-merge/{session}',                            [UnisciOrganizzaController::class, 'editorMerge'])->name('unisciorganizza.editor-merge');
+    Route::get('/unisci-organizza/pdf-merge/{session}/{index}',                       [UnisciOrganizzaController::class, 'servePdfMerge'])->name('unisciorganizza.pdf-merge');
+    Route::post('/unisci-organizza/applica-merge',                                    [UnisciOrganizzaController::class, 'applicaMerge'])->name('unisciorganizza.applica-merge');
+    Route::get('/unisci-organizza/editor-organizza/{session}',                        [UnisciOrganizzaController::class, 'editorOrganizza'])->name('unisciorganizza.editor-organizza');
+    Route::get('/unisci-organizza/pdf-organizza/{session}',                           [UnisciOrganizzaController::class, 'servePdfOrganizza'])->name('unisciorganizza.pdf-organizza');
+    Route::post('/unisci-organizza/applica-organizza',                                [UnisciOrganizzaController::class, 'applicaOrganizza'])->name('unisciorganizza.applica-organizza');
+    Route::get('/unisci-organizza/download/{file}',                                   [UnisciOrganizzaController::class, 'download'])->name('unisciorganizza.download');
+    Route::match(['delete', 'post'], '/unisci-organizza/elimina/{session}',           [UnisciOrganizzaController::class, 'elimina'])->name('unisciorganizza.elimina');
 
 });

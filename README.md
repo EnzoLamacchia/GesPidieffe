@@ -19,6 +19,7 @@ Fa parte dell'ecosistema **AdmEL** ed è progettato per essere integrato come pa
 | **Organizza pagine** | Griglia drag & drop per riordinare, duplicare o eliminare singole pagine |
 | **Ruota pagine** | Ruota singole pagine o l'intero documento a passi di 90°; badge visivo con i gradi correnti |
 | **Numerazione pagine** | Aggiunge numeri di pagina con posizione, font, dimensione e colore personalizzabili; testo originale rimane selezionabile |
+| **Unisci e Organizza** | Workflow a 3 passi: carica più PDF → riordina i file con drag & drop → unisce automaticamente → editor pagine per riordinare/duplicare/eliminare → download PDF finale |
 | **Statistiche utilizzo** | Dashboard con contatori giornalieri, settimanali e globali per ciascuna funzione; storico delle ultime 12 settimane; accessibile solo agli utenti con permesso `usa gespidieffe` |
 
 ---
@@ -192,6 +193,17 @@ Prefix URI: `/gespidieffe` — Named prefix: `gespidieffe.`
 | GET | `/gespidieffe/numera/download/{file}` | `gespidieffe.numera.download` |
 | DELETE/POST | `/gespidieffe/numera/elimina/{file}` | `gespidieffe.numera.elimina` |
 | GET | `/gespidieffe/numera/pdf/{file}` | `gespidieffe.numera.pdf` |
+| GET | `/gespidieffe/unisci-organizza` | `gespidieffe.unisciorganizza` |
+| POST | `/gespidieffe/unisci-organizza/upload` | `gespidieffe.unisciorganizza.upload` |
+| GET | `/gespidieffe/unisci-organizza/aggiungi/{session}` | `gespidieffe.unisciorganizza.aggiungi` |
+| GET | `/gespidieffe/unisci-organizza/editor-merge/{session}` | `gespidieffe.unisciorganizza.editor-merge` |
+| GET | `/gespidieffe/unisci-organizza/pdf-merge/{session}/{index}` | `gespidieffe.unisciorganizza.pdf-merge` |
+| POST | `/gespidieffe/unisci-organizza/applica-merge` | `gespidieffe.unisciorganizza.applica-merge` |
+| GET | `/gespidieffe/unisci-organizza/editor-organizza/{session}` | `gespidieffe.unisciorganizza.editor-organizza` |
+| GET | `/gespidieffe/unisci-organizza/pdf-organizza/{session}` | `gespidieffe.unisciorganizza.pdf-organizza` |
+| POST | `/gespidieffe/unisci-organizza/applica-organizza` | `gespidieffe.unisciorganizza.applica-organizza` |
+| GET | `/gespidieffe/unisci-organizza/download/{file}` | `gespidieffe.unisciorganizza.download` |
+| DELETE/POST | `/gespidieffe/unisci-organizza/elimina/{session}` | `gespidieffe.unisciorganizza.elimina` |
 | GET | `/gespidieffe/statistiche` | `gespidieffe.statistiche` |
 
 > La route `/statistiche` richiede il middleware aggiuntivo `permission:usa gespidieffe` (Spatie Laravel Permission).
@@ -219,10 +231,46 @@ Ogni funzione segue questo schema a cinque fasi:
                               → scheduler rimuove automaticamente file > 24h
 ```
 
+### Flusso speciale: Unisci e Organizza (3 passi)
+
+La funzione **Unisci e Organizza** usa un flusso esteso a tre passi con una sessione UUID condivisa:
+
+```
+Passo 1 – Upload
+  → POST /unisci-organizza/upload
+  → Salva i file come {session}_uo_f0.pdf, {session}_uo_f1.pdf, …
+  → Crea manifest JSON ({session}_uo_manifest.json)
+  → Redirect a editor-merge
+
+Passo 2 – Editor Merge (ordina i file)
+  → GET  /unisci-organizza/editor-merge/{session}
+  → Thumbnails via /pdf-merge/{session}/{index}  (serve il file originale Nth)
+  → POST /unisci-organizza/applica-merge
+     → qpdf unisce i file nell'ordine scelto → {session}_uo_merged.pdf
+     → Risposta JSON { redirect: url_editor_organizza }  (NON download_token)
+  → JS naviga a editor-organizza
+
+Passo 3 – Editor Organizza (riordina/duplica/elimina pagine)
+  → GET  /unisci-organizza/editor-organizza/{session}
+  → Thumbnails via /pdf-organizza/{session}  (serve _uo_merged.pdf)
+  → POST /unisci-organizza/applica-organizza
+     → qpdf riorganizza le pagine → {session}_uo_finale.pdf
+     → Risposta JSON { download_token }
+  → Download via /unisci-organizza/download/{token}
+
+Pulizia
+  → DELETE/POST /unisci-organizza/elimina/{session}
+  → Rimuove tutti i file {session}_uo*
+  → Flag window._uoSkipCleanup evita il beacon su navigazione interna
+```
+
+**Colori UI:** arancione (`#ea580c` / `#f97316`) con inline CSS (Tailwind CDN 2.x non include le classi `orange-*`).
+
 ### File temporanei
 
 - Cartella: `storage/app/gespidieffe/tmp/`
-- Naming: `{uuid}.pdf` (originale), `{uuid}_<suffisso>.pdf` (output elaborato)
+- Naming standard: `{uuid}.pdf` (originale), `{uuid}_<suffisso>.pdf` (output)
+- Naming Unisci e Organizza: `{session}_uo_f{N}.pdf`, `{session}_uo_manifest.json`, `{session}_uo_merged.pdf`, `{session}_uo_finale.pdf`
 
 ---
 
@@ -244,6 +292,7 @@ package/gespidieffe/
     │   ├── OrganizzaPdfController.php
     │   ├── RuotaPdfController.php
     │   ├── NumeraPdfController.php
+    │   ├── UnisciOrganizzaController.php
     │   └── StatisticheController.php
     ├── Models/
     │   ├── GespidieffeContatore.php
@@ -275,9 +324,13 @@ package/gespidieffe/
         ├── ruota/
         │   ├── upload.blade.php
         │   └── editor.blade.php
-        └── numera/
+        ├── numera/
+        │   ├── upload.blade.php
+        │   └── editor.blade.php
+        └── unisciorganizza/
             ├── upload.blade.php
-            └── editor.blade.php
+            ├── editor-merge.blade.php
+            └── editor-organizza.blade.php
 ```
 
 ---
