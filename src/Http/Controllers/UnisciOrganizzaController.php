@@ -195,8 +195,6 @@ class UnisciOrganizzaController extends Controller
 
         abort_unless(file_exists($mergedPath), 500, 'Merge fallito.');
 
-        (new ContatorePdfService())->incrementa('merge');
-
         // Conta le pagine del merged per passarle all'editor-organizza
         $pages = $this->qpdfPageCount($mergedPath);
 
@@ -275,7 +273,7 @@ class UnisciOrganizzaController extends Controller
 
         abort_unless(file_exists($outPath), 500, 'Elaborazione fallita.');
 
-        (new ContatorePdfService())->incrementa('organizza');
+        (new ContatorePdfService())->incrementa('unisci_organizza');
 
         return response()->json([
             'download_token' => $session . '_uo_finale',

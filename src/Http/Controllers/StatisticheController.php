@@ -32,7 +32,7 @@ class StatisticheController extends Controller
         // Storico settimanale: ultime 12 settimane, raggruppato per settimana
         $storico = GespidieffeStoricoSettimanale::orderByDesc('anno')
             ->orderByDesc('settimana')
-            ->limit(12 * 6)   // max 12 settimane × 6 servizi
+            ->limit(12 * 7)   // max 12 settimane × 7 servizi
             ->get()
             ->groupBy(fn($r) => $r->anno . '-W' . str_pad($r->settimana, 2, '0', STR_PAD_LEFT));
 

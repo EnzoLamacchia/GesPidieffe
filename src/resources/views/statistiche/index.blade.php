@@ -4,12 +4,14 @@
     @php
         // Mappa colori e icone per ciascun servizio
         $config = [
-            'censura'   => ['label' => 'Censura PDF',     'color' => 'red',    'icon' => '🔴', 'bg' => 'bg-red-50',     'border' => 'border-red-200',    'text' => 'text-red-700',    'badge' => 'bg-red-100 text-red-800'],
-            'merge'     => ['label' => 'Merge PDF',        'color' => 'blue',   'icon' => '🔵', 'bg' => 'bg-blue-50',    'border' => 'border-blue-200',   'text' => 'text-blue-700',   'badge' => 'bg-blue-100 text-blue-800'],
-            'split'     => ['label' => 'Split PDF',        'color' => 'purple', 'icon' => '🟣', 'bg' => 'bg-purple-50',  'border' => 'border-purple-200', 'text' => 'text-purple-700', 'badge' => 'bg-purple-100 text-purple-800'],
-            'organizza' => ['label' => 'Organizza pagine', 'color' => 'yellow', 'icon' => '🟡', 'bg' => 'bg-yellow-50',  'border' => 'border-yellow-200', 'text' => 'text-yellow-700', 'badge' => 'bg-yellow-100 text-yellow-800'],
-            'ruota'     => ['label' => 'Ruota pagine',     'color' => 'green',  'icon' => '🟢', 'bg' => 'bg-green-50',   'border' => 'border-green-200',  'text' => 'text-green-700',  'badge' => 'bg-green-100 text-green-800'],
-            'numera'    => ['label' => 'Numera pagine',    'color' => 'indigo', 'icon' => '🔷', 'bg' => 'bg-indigo-50',  'border' => 'border-indigo-200', 'text' => 'text-indigo-700', 'badge' => 'bg-indigo-100 text-indigo-800'],
+            'censura'          => ['label' => 'Censura PDF',        'icon' => '🔴', 'bg' => 'bg-red-50',    'border' => 'border-red-200',    'text' => 'text-red-700',    'badge' => 'bg-red-100 text-red-800',    'bar' => 'background:#b91c1c'],
+            'merge'            => ['label' => 'Merge PDF',           'icon' => '🔵', 'bg' => 'bg-blue-50',   'border' => 'border-blue-200',   'text' => 'text-blue-700',   'badge' => 'bg-blue-100 text-blue-800',   'bar' => 'background:#1d4ed8'],
+            'split'            => ['label' => 'Split PDF',           'icon' => '🟣', 'bg' => 'bg-purple-50', 'border' => 'border-purple-200', 'text' => 'text-purple-700', 'badge' => 'bg-purple-100 text-purple-800','bar' => 'background:#7e22ce'],
+            'organizza'        => ['label' => 'Organizza pagine',    'icon' => '🟡', 'bg' => 'bg-yellow-50', 'border' => 'border-yellow-200', 'text' => 'text-yellow-700', 'badge' => 'bg-yellow-100 text-yellow-800','bar' => 'background:#a16207'],
+            'ruota'            => ['label' => 'Ruota pagine',        'icon' => '🟢', 'bg' => 'bg-green-50',  'border' => 'border-green-200',  'text' => 'text-green-700',  'badge' => 'bg-green-100 text-green-800',  'bar' => 'background:#15803d'],
+            'numera'           => ['label' => 'Numera pagine',       'icon' => '🔷', 'bg' => 'bg-indigo-50', 'border' => 'border-indigo-200', 'text' => 'text-indigo-700', 'badge' => 'bg-indigo-100 text-indigo-800','bar' => 'background:#3730a3'],
+            'unisci_organizza' => ['label' => 'Unisci e Sistema',  'icon' => '🟠', 'bg' => '',             'border' => '',                  'text' => '',                'badge' => '',                             'bar' => 'background:#ea580c',
+                                   'bgStyle' => 'background:#fff7ed', 'borderStyle' => 'border:1px solid #fed7aa', 'textStyle' => 'color:#c2410c', 'badgeStyle' => 'background:#fed7aa;color:#9a3412'],
         ];
     @endphp
 
@@ -62,18 +64,26 @@
         {{-- ── Dettaglio per servizio ─────────────────────────────────────── --}}
         <div>
             <h2 class="text-base font-semibold text-gray-600 mb-4 uppercase tracking-wider">Dettaglio per funzione</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 @foreach ($config as $servizio => $cfg)
-                    @php $c = $contatori->get($servizio) @endphp
-                    <div class="{{ $cfg['bg'] }} {{ $cfg['border'] }} border rounded-2xl p-5 space-y-4">
+                    @php
+                        $c         = $contatori->get($servizio);
+                        $useInline = isset($cfg['bgStyle']);
+                    @endphp
+                    <div class="rounded-2xl p-5 space-y-4 {{ $useInline ? '' : $cfg['bg'].' '.$cfg['border'].' border' }}"
+                         @if($useInline) style="{{ $cfg['bgStyle'] }};{{ $cfg['borderStyle'] }}" @endif>
 
                         {{-- Intestazione --}}
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2">
                                 <span class="text-lg">{{ $cfg['icon'] }}</span>
-                                <span class="font-semibold {{ $cfg['text'] }} text-sm">{{ $cfg['label'] }}</span>
+                                <span class="font-semibold text-sm {{ $useInline ? '' : $cfg['text'] }}"
+                                      @if($useInline) style="{{ $cfg['textStyle'] }}" @endif>
+                                    {{ $cfg['label'] }}
+                                </span>
                             </div>
-                            <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ $cfg['badge'] }}">
+                            <span class="text-xs px-2 py-0.5 rounded-full font-medium {{ $useInline ? '' : $cfg['badge'] }}"
+                                  @if($useInline) style="{{ $cfg['badgeStyle'] }}" @endif>
                                 tot. {{ number_format($c->contatore_globale ?? 0) }}
                             </span>
                         </div>
@@ -82,9 +92,6 @@
                         @php
                             $giornaliero = $c->contatore_giornaliero ?? 0;
                             $settimanale = $c->contatore_settimanale ?? 0;
-                            $globale     = $c->contatore_globale ?? 0;
-                            $maxBar      = max($totaleGiornaliero, 1);
-                            $maxBarS     = max($totaleSettimanale, 1);
                         @endphp
 
                         <div class="space-y-2">
@@ -92,11 +99,14 @@
                             <div>
                                 <div class="flex justify-between text-xs text-gray-500 mb-1">
                                     <span>Oggi</span>
-                                    <span class="font-semibold {{ $cfg['text'] }}">{{ number_format($giornaliero) }}</span>
+                                    <span class="font-semibold {{ $useInline ? '' : $cfg['text'] }}"
+                                          @if($useInline) style="{{ $cfg['textStyle'] }}" @endif>
+                                        {{ number_format($giornaliero) }}
+                                    </span>
                                 </div>
                                 <div class="h-2 bg-white bg-opacity-60 rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full bg-current {{ $cfg['text'] }} transition-all duration-500"
-                                         style="width: {{ $totaleGiornaliero > 0 ? round(($giornaliero / $totaleGiornaliero) * 100) : 0 }}%"></div>
+                                    <div class="h-full rounded-full transition-all duration-500 {{ $useInline ? '' : 'bg-current '.$cfg['text'] }}"
+                                         style="width:{{ $totaleGiornaliero > 0 ? round(($giornaliero / $totaleGiornaliero) * 100) : 0 }}%;{{ $useInline ? $cfg['bar'] : '' }}"></div>
                                 </div>
                             </div>
 
@@ -104,11 +114,14 @@
                             <div>
                                 <div class="flex justify-between text-xs text-gray-500 mb-1">
                                     <span>Settimana</span>
-                                    <span class="font-semibold {{ $cfg['text'] }}">{{ number_format($settimanale) }}</span>
+                                    <span class="font-semibold {{ $useInline ? '' : $cfg['text'] }}"
+                                          @if($useInline) style="{{ $cfg['textStyle'] }}" @endif>
+                                        {{ number_format($settimanale) }}
+                                    </span>
                                 </div>
                                 <div class="h-2 bg-white bg-opacity-60 rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full bg-current {{ $cfg['text'] }} transition-all duration-500"
-                                         style="width: {{ $totaleSettimanale > 0 ? round(($settimanale / $totaleSettimanale) * 100) : 0 }}%"></div>
+                                    <div class="h-full rounded-full transition-all duration-500 {{ $useInline ? '' : 'bg-current '.$cfg['text'] }}"
+                                         style="width:{{ $totaleSettimanale > 0 ? round(($settimanale / $totaleSettimanale) * 100) : 0 }}%;{{ $useInline ? $cfg['bar'] : '' }}"></div>
                                 </div>
                             </div>
                         </div>

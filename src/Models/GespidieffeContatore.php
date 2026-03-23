@@ -29,5 +29,6 @@ class GespidieffeContatore extends Model
         'organizza',
         'ruota',
         'numera',
+        'unisci_organizza',
     ];
 }
