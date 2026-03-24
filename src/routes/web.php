@@ -8,6 +8,7 @@ use Elamacchia\Gespidieffe\Http\Controllers\OrganizzaPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\RuotaPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\SplitPdfController;
 use Elamacchia\Gespidieffe\Http\Controllers\StatisticheController;
+use Elamacchia\Gespidieffe\Http\Controllers\PdfToWordController;
 use Elamacchia\Gespidieffe\Http\Controllers\UnisciOrganizzaController;
 use Illuminate\Support\Facades\Route;
 
@@ -95,5 +96,13 @@ Route::group([
     Route::post('/unisci-organizza/applica-organizza',                                [UnisciOrganizzaController::class, 'applicaOrganizza'])->name('unisciorganizza.applica-organizza');
     Route::get('/unisci-organizza/download/{file}',                                   [UnisciOrganizzaController::class, 'download'])->name('unisciorganizza.download');
     Route::match(['delete', 'post'], '/unisci-organizza/elimina/{session}',           [UnisciOrganizzaController::class, 'elimina'])->name('unisciorganizza.elimina');
+
+    // --- PDF to Word ---
+    Route::get('/pdf2word',                                          [PdfToWordController::class, 'index'])->name('pdf2word');
+    Route::post('/pdf2word/upload',                                  [PdfToWordController::class, 'upload'])->name('pdf2word.upload');
+    Route::get('/pdf2word/confirm/{file}',                           [PdfToWordController::class, 'confirm'])->name('pdf2word.confirm');
+    Route::post('/pdf2word/applica',                                 [PdfToWordController::class, 'applica'])->name('pdf2word.applica');
+    Route::get('/pdf2word/download/{file}',                          [PdfToWordController::class, 'download'])->name('pdf2word.download');
+    Route::match(['delete', 'post'], '/pdf2word/elimina/{file}',     [PdfToWordController::class, 'elimina'])->name('pdf2word.elimina');
 
 });

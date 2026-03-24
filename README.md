@@ -21,6 +21,7 @@ Fa parte dell'ecosistema **AdmEL** ed è progettato per essere integrato come pa
 | **Numerazione pagine** | Aggiunge numeri di pagina con posizione, font, dimensione e colore personalizzabili; testo originale rimane selezionabile |
 | **Unisci e Organizza** | Workflow a 3 passi: carica più PDF → riordina i file con drag & drop → unisce automaticamente → editor pagine per riordinare/duplicare/eliminare → download PDF finale |
 | **Statistiche utilizzo** | Dashboard con contatori giornalieri, settimanali e globali per ciascuna funzione; storico delle ultime 12 settimane; accessibile solo agli utenti con permesso `usa gespidieffe` |
+| **PDF to Word** | Converte un PDF in documento Word (.docx) editabile. Rileva automaticamente il tipo di PDF (nativo/ibrido/scansionato) e applica la strategia di conversione ottimale. |
 
 ---
 
@@ -48,15 +49,33 @@ I seguenti strumenti devono essere presenti nel container PHP:
 
 | Strumento | Utilizzo |
 |---|---|
-| `qpdf` | Merge, split, rotazione, conteggio pagine, estrazione in formato JSON |
-| `ghostscript` (`gs`) | Rasterizzazione di pagine PDF in PNG (per la censura raster) |
+| `qpdf` | Merge, split, rotazione, conteggio pagine, estrazione JSON |
+| `ghostscript` (`gs`) | Rasterizzazione pagine PDF in PNG (censura raster; OCR su PDF scansionati) |
 | `pdftk` | Applicazione overlay di numerazione pagine (`multistamp`) |
+| `libreoffice` + `libreoffice-writer` | Conversione `.txt` → `.docx` (PDF ibridi e scansionati) |
+| `tesseract-ocr` + `tesseract-ocr-ita` | OCR su pagine rasterizzate (PDF scansionati) |
+| `poppler-utils` | `pdftotext`, `pdfimages`, `pdfinfo` — estrazione testo, analisi immagini, dimensioni pagina |
+| `pandoc` | Conversione `.txt` → `.docx` strutturato (PDF ibridi e scansionati) |
+| `python3` + `pdf2docx` | Conversione PDF nativo → `.docx` con layout, tabelle e immagini preservati |
 
-Nel Dockerfile (Laravel Sail, runtime PHP 8.1) questi pacchetti vengono installati con:
+Nel Dockerfile (Laravel Sail, runtime PHP 8.1) i pacchetti di sistema vengono installati con:
 
 ```dockerfile
-apt-get install -y ghostscript qpdf pdftk
+apt-get install -y ghostscript qpdf pdftk libreoffice libreoffice-writer tesseract-ocr tesseract-ocr-ita poppler-utils
 ```
+
+`pandoc` non è nei repo Ubuntu 22.04 — va installato dal pacchetto `.deb` ufficiale:
+```bash
+curl -sLO https://github.com/jgm/pandoc/releases/download/3.1.13/pandoc-3.1.13-1-amd64.deb
+dpkg -i pandoc-3.1.13-1-amd64.deb
+```
+
+`pdf2docx` va installato con pip:
+```bash
+pip install pdf2docx
+```
+
+> **Server standalone (Linux/AlmaLinux):** usare un virtualenv dedicato per pdf2docx — NON installare come root globale. Vedere `2DO/server2do.md` per le istruzioni complete.
 
 ---
 
@@ -205,6 +224,12 @@ Prefix URI: `/gespidieffe` — Named prefix: `gespidieffe.`
 | GET | `/gespidieffe/unisci-organizza/download/{file}` | `gespidieffe.unisciorganizza.download` |
 | DELETE/POST | `/gespidieffe/unisci-organizza/elimina/{session}` | `gespidieffe.unisciorganizza.elimina` |
 | GET | `/gespidieffe/statistiche` | `gespidieffe.statistiche` |
+| GET | `/gespidieffe/pdf2word` | `gespidieffe.pdf2word` |
+| POST | `/gespidieffe/pdf2word/upload` | `gespidieffe.pdf2word.upload` |
+| GET | `/gespidieffe/pdf2word/confirm/{file}` | `gespidieffe.pdf2word.confirm` |
+| POST | `/gespidieffe/pdf2word/applica` | `gespidieffe.pdf2word.applica` |
+| GET | `/gespidieffe/pdf2word/download/{file}` | `gespidieffe.pdf2word.download` |
+| DELETE/POST | `/gespidieffe/pdf2word/elimina/{file}` | `gespidieffe.pdf2word.elimina` |
 
 > La route `/statistiche` richiede il middleware aggiuntivo `permission:usa gespidieffe` (Spatie Laravel Permission).
 
@@ -327,11 +352,71 @@ package/gespidieffe/
         ├── numera/
         │   ├── upload.blade.php
         │   └── editor.blade.php
-        └── unisciorganizza/
-            ├── upload.blade.php
-            ├── editor-merge.blade.php
-            └── editor-organizza.blade.php
+        ├── unisciorganizza/
+        │   ├── upload.blade.php
+        │   ├── editor-merge.blade.php
+        │   └── editor-organizza.blade.php
+        └── pdftoword/
+            └── upload.blade.php
 ```
+
+---
+
+## Architettura: flusso PDF to Word
+
+La funzione **PDF to Word** usa un flusso a 2 step con rilevamento automatico del tipo di PDF.
+
+### Step 1 — Rilevamento tipo PDF
+
+Il controller analizza il PDF con tre strumenti in sequenza:
+
+1. **`qpdf --show-npages`** — conta le pagine
+2. **`pdfinfo`** — legge le dimensioni della pagina in punti PDF
+3. **`pdfimages -list`** — elenca le immagini con dimensioni in pixel e DPI
+
+Per ogni immagine viene calcolata la **copertura percentuale** rispetto alla pagina:
+```
+imgPtW = imgPixelW / xDPI * 72
+imgPtH = imgPixelH / yDPI * 72
+copertura = (imgPtW × imgPtH) / (paginaPtW × paginaPtH)
+```
+Se `copertura >= 0.85` → l'immagine copre la pagina intera.
+
+4. **`pdftotext`** — estrae il testo (incluso OCR invisibile)
+
+### Classificazione
+
+| Immagini a piena pagina | Testo estraibile (≥20 chars) | Tipo | Badge UI |
+|---|---|---|---|
+| No | Sì | `nativo` | verde |
+| No | No | `scansionato` | arancio |
+| Sì (tutte le pagine) | Sì | `ibrido` | blu — OCR invisibile già presente (es. ScanSnap) |
+| Sì (tutte le pagine) | No | `scansionato` | arancio |
+| Sì (alcune pagine) | Sì | `ibrido` | blu |
+| Sì (alcune pagine) | No | `scansionato` | arancio |
+
+### Step 2 — Conversione in base al tipo
+
+| Tipo | Strumento | Qualità |
+|---|---|---|
+| `nativo` | **pdf2docx** (Python) | Layout, tabelle, immagini preservati |
+| `ibrido` | **pdftotext -layout** → **Pandoc** → `.docx` | Testo strutturato; immagini perse. Usa l'OCR invisibile già presente nel PDF senza rifarlo |
+| `scansionato` | **Ghostscript** (rasterizza 300 DPI) → **Tesseract** OCR (ita+eng) → **Pandoc** → `.docx` | Solo testo; layout perso |
+
+### Note sul tipo ibrido
+
+I PDF prodotti da scanner fisici (es. **ScanSnap**, Adobe PDF Scan Library) contengono:
+- Immagini a piena pagina come contenuto principale
+- Un layer di testo OCR invisibile sovrapposto, generato automaticamente dallo scanner
+
+`pdfimages` rileva le immagini a piena pagina; `pdftotext` estrae il testo OCR invisibile già presente.
+Invece di rifare l'OCR con Tesseract (più lento, qualità variabile), il flusso ibrido riutilizza
+il testo già estratto dallo scanner (qualità solitamente superiore).
+
+### File temporanei
+
+- Naming: `{uuid}.pdf` (originale), `{uuid}_pdf2word.docx` (output)
+- Cleanup: glob `{uuid}*` — eliminati al `beforeunload` (se non si scarica) e dallo scheduler orario
 
 ---
 

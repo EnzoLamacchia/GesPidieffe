@@ -204,6 +204,36 @@
                 </div>
             </a>
 
+            {{-- PDF TO WORD --}}
+            <a href="{{ route('gespidieffe.pdf2word') }}"
+               class="group flex flex-col bg-white rounded-2xl shadow-sm border border-gray-200
+                      hover:shadow-lg transition-all duration-200 overflow-hidden"
+               onmouseenter="this.style.borderColor='#99f6e4'"
+               onmouseleave="this.style.borderColor=''">
+                <div class="flex items-center justify-center h-28 transition-all duration-200"
+                     style="background: linear-gradient(135deg, #f0fdfa, #ccfbf1);">
+                    <svg class="w-12 h-12" style="color:#0d9488" fill="none" viewBox="0 0 24 24"
+                         stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5
+                                 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5
+                                 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125
+                                 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                </div>
+                <div class="p-4 flex-1">
+                    <h3 class="text-sm font-bold text-gray-900 mb-1">PDF to Word</h3>
+                    <p class="text-xs text-gray-500 leading-relaxed">
+                        Converti un PDF in documento Word (.docx) editabile. Rilevamento automatico di PDF nativi e scansionati.
+                    </p>
+                </div>
+                <div class="px-4 pb-3">
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold" style="color:#0f766e">
+                        Apri <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg>
+                    </span>
+                </div>
+            </a>
+
         </div>
     </div>
 </div>
