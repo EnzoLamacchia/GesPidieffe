@@ -123,6 +123,38 @@
                 </span>
             </div>
 
+            {{-- Card descrizione processo ──────────────────────── --}}
+            <div class="mt-3 p-4 rounded-xl bg-white shadow-sm"
+                 style="border:1px solid {{ $tipo === 'nativo' ? '#99f6e4' : ($tipo === 'ibrido' ? '#bfdbfe' : '#fde68a') }}">
+                @if($tipo === 'nativo')
+                    <p class="text-xs font-semibold mb-1" style="color:#0f766e">Cosa otterrai</p>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        Ottimo! Questo PDF contiene testo reale, quindi la conversione produrrà un documento Word
+                        di buona qualità, con paragrafi, tabelle e immagini al loro posto.
+                        Potrai modificarlo direttamente in Word o LibreOffice.
+                        Potrebbero esserci piccole differenze di impaginazione rispetto all'originale,
+                        ma il contenuto sarà completo e ben strutturato.
+                    </p>
+                @elseif($tipo === 'ibrido')
+                    <p class="text-xs font-semibold mb-1" style="color:#1d4ed8">Cosa otterrai</p>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        Questo PDF è una scansione che contiene già del testo riconosciuto al suo interno.
+                        Il documento Word che otterrai avrà tutto il testo, ma <strong>senza la grafica originale</strong>:
+                        niente colonne, intestazioni visive o immagini — solo il testo scorrevole e modificabile.
+                        È la soluzione giusta se hai bisogno di copiare, correggere o rielaborare il contenuto.
+                    </p>
+                @else
+                    <p class="text-xs font-semibold mb-1" style="color:#92400e">Cosa otterrai</p>
+                    <p class="text-xs text-gray-600 leading-relaxed">
+                        Questo PDF è una scansione pura — come una fotografia del documento originale.
+                        Il sistema proverà a leggere il testo dalle immagini e a trascriverlo in un documento Word.
+                        Il risultato dipende molto dalla qualità della scansione: testo nitido e dritto
+                        viene riconosciuto bene; scansioni storte, sbiadite o scritte a mano potrebbero
+                        dare un risultato parziale o con errori. Il layout originale non verrà riprodotto.
+                    </p>
+                @endif
+            </div>
+
             {{-- Risultato download --}}
             <div id="downloadWrap" class="hidden mt-4 p-4 rounded-xl text-center"
                  style="background:#f0fdfa; border:1px solid #99f6e4">
